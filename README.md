@@ -113,6 +113,52 @@ error instead of skewing a decision at runtime:
 | `b_` | boolean | `== true` / `== false` / `test(...)` |
 | `m_` | metadata (label, identifier) | equality and string operators |
 
+The prefix describes how a result may be used; the function describes the
+embedding operation. The built-in vector surface is:
+
+| Function | What it does | Result and rule use |
+|---|---|---|
+| `s_cosine(left, right)` | Embeds two texts and measures cosine similarity. | Raw similarity; assign it to a fact in `then`. |
+| `s_dot(left, right)` | Embeds two texts and takes their dot product without normalizing in the function. | Raw scalar that preserves any vector-magnitude signal; assign it to a fact in `then`. |
+| `s_contrast(candidate, positive, negative)` | Computes `cos(candidate, positive) - cos(candidate, negative)` so shared topic meaning cancels and the semantic contrast remains. | Raw directional evidence; assign it to a fact in `then`. |
+| `s_project(text, axis)` | Projects text onto a named axis fitted from positive and negative exemplar sets. | Raw axis position; assign it to a fact in `then`. |
+| `c_project(text, axis)` | Projects text onto a calibrated axis and ranks the result against its reference window. | Percentile in `[0, 100]`; compare it directly in `when`. |
+| `s_depth(text, region)` | Measures graded depth in a named region fitted around an exemplar cloud (`1.0` at the fitted boundary; smaller is deeper inside). | Raw region evidence; assign it to a fact in `then`. |
+| `b_member(text, region)` | Tests the same fitted region at its coverage threshold. | Boolean; test it directly in `when`. |
+
+Pairwise functions accept fact values or literal text. Artifact-backed
+functions refer to a stable policy concept by name: an axis represents a
+semantic direction such as routine-to-urgent, while a region represents a
+cluster such as known business-email-compromise phrasing. The bridge
+canonicalizes every text argument before embedding it.
+
+Raw measurements support forward chaining without making an uncalibrated model
+score look like a universal policy threshold. A measurement rule records the
+evidence as a fact; a later rule combines that fact with ordinary conditions.
+Calibrated and boolean artifact functions can participate in a decision
+directly:
+
+```grl
+rule "MeasureSemanticEvidence" no-loop {
+    when
+        Payment.text != ""
+    then
+        Payment.urgency_contrast =
+            s_contrast(Payment.text, "urgent and pressured", "routine and flexible");
+        Payment.bec_depth = s_depth(Payment.text, "bec_phrasing_v1");
+}
+
+rule "HoldHighRiskRequest" salience 100 no-loop {
+    when
+        c_project(Payment.text, "urgency_pressure_v1") >= 90.0 &&
+        b_member(Payment.text, "bec_phrasing_v1") == true &&
+        Payment.new_payee == true &&
+        Payment.amount >= 10000.0
+    then
+        Decision.action = "hold";
+}
+```
+
 Axes, calibration windows, and regions are **named artifacts** fitted offline
 (or in the browser) from exemplar sets. Each artifact records its provenance —
 model, dimension, task prefix, exemplar-set version — and registration
