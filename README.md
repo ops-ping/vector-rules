@@ -71,6 +71,52 @@ rollout notes. Schema validation, GRL parsing, engine firing, stream state,
 proof, pinned rule revisions, and audit records remain the reviewable source of
 runtime truth.
 
+## What is a rules engine?
+
+A rules engine applies **declarative policy** to facts. Conventional application
+code describes a fixed sequence of calls and branches: first do this, then test
+that, then choose a path. A rule instead states only the policy relationship:
+**when these facts are true, derive this fact or take this action**. The engine
+determines which rules apply, adds their conclusions to the working facts, and
+continues evaluating until those conclusions no longer activate more rules.
+
+This forward chaining automatically wires simple, independently understandable
+policies into complex behavior. Rules do not call one another or need to know
+the complete workflow. They connect through the facts they consume and produce:
+
+| Simple policy | Fact or decision it produces |
+|---|---|
+| Language in a document expresses unusual urgency or pressure | `urgent_request` |
+| A payment has a new payee and exceeds an amount threshold | `elevated_payment_risk` |
+| A request is urgent and has elevated payment risk | `manual_review_required` |
+| Manual review is required | Hold the payment and record the reason |
+
+Each policy remains small, but together they produce a multi-stage decision.
+There is no hard-coded orchestration between the first rule and the last. The
+document and its surrounding context supply the facts that connect the policy
+graph, so different content naturally activates a different path. Adding a new
+policy can extend that graph without rewriting a central decision tree or
+prompt.
+
+In vector-rules, facts can come from structured fields, unstructured document
+content, canonicalization, embeddings, application state, prior events, and
+organizational context. Semantic evidence can therefore enter the same
+deterministic chain as exact values: embeddings interpret what the content
+means, while explicit rules decide what that meaning permits or requires.
+
+This is the advantage of **policy as code**:
+
+- **Composable:** small policies combine through shared facts instead of a
+  growing web of application-specific branches.
+- **Content-driven:** the applicable policy path follows the document rather
+  than forcing every document through one predefined workflow.
+- **Explainable:** a trace shows each input fact, fired rule, derived fact, and
+  final decision.
+- **Governable:** policy can be reviewed, tested, versioned, promoted, and
+  rolled back in git.
+- **Reusable:** the same policy and fact model can run across applications,
+  agents, streams, batch jobs, and browsers.
+
 ## From input to decision
 
 A complete vector-rules decision path can use the following stages:
