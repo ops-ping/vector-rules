@@ -188,11 +188,11 @@ the cache identity. Persistent deployments can set `model_path`, `model`,
 `model_sha256`, and the `/models` preopen in `vrules-components.json`. Models
 without pooling metadata can set `pooling` to `mean`, `cls`, or `last`.
 
-The standalone [`apps/examples`](apps/examples) app demonstrates layered semantic
-similarity, contrast axes, fraud triage over fitted geometry artifacts, and
-forward chaining from semantic evidence into deterministic facts — each running
-entirely in the browser, embeddings on WebGPU or CPU. The
-[browser examples gallery](docs/EXAMPLES.md) walks through every capability.
+The semantic-rules example in [`apps/examples`](apps/examples) demonstrates
+layered similarity, contrast, and forward chaining from semantic evidence into
+deterministic facts. It runs entirely in the browser with embeddings on WebGPU
+or CPU. The [browser examples gallery](docs/EXAMPLES.md) covers the complete
+reference suite.
 
 ![Semantic similarity over EmbeddingGemma vectors with a forward-chaining trace, running in the browser](docs/examples-semantic.png)
 
@@ -202,7 +202,7 @@ entirely in the browser, embeddings on WebGPU or CPU. The
 |---|---|
 | **Agent and MCP mediation** | The runtime and rules components use connection and request facts to expose allowed tools, choose providers, and audit execution. |
 | **Organizational memory** | Append-only storage, `em-log-n`, and `vrules-canon` provide model-aware vectors, policy-controlled recall, and searchable provenance. |
-| **Reference business workflow** | Address verification proves that generic rules can combine native functions, embeddings, indexes, and organizational policy without making the address domain part of the framework. |
+| **Reference workflows** | Browser examples combine rules, native functions, embeddings, indexes, and organizational policy without adding application domains to the framework. |
 | **Application decisions** | Rust hosts parse GRL into `Ruleset` and evaluate structured `Facts` through `RustRuleEngine`. |
 | **Streaming workloads** | The upstream synchronous `StreamProcessor` provides one-event/one-result processing with windows, watermarks, joins, state, and the optional upstream Redis-backed `StateStore`. |
 | **Browser analysis** | `vrules-wasm` runs GRL validation, forward evaluation, reference workflows, and backward proof with native Rust semantics. |
@@ -221,6 +221,7 @@ flowchart LR
     Host --> Runtime["runtime WASI component"]
     Host --> Rules["rules WASI component"]
     Host --> Storage["append-only storage WASI component"]
+    Host --> Cache["content-addressed embedding cache<br/>WASI component"]
     Host --> Admin["admin WASI component"]
     Host --> GCP["optional GCP WASI component"]
     Host --> Embedding["wllama WASI component<br/>configured GGUF model"]
@@ -294,18 +295,77 @@ the reasoning afterward.
 | Component | Responsibility |
 |---|---|
 | [`vrules-shim`](crates/vrules-shim) | Native Wasmtime host, MCP stdio/WebSocket transport, admin HTTP surface, component capabilities, and model overrides |
-| `vrules-runtime-component` | MCP protocol, rule-driven tool exposure and routing, audit, cache, and memory tools |
+| `vrules-runtime-component` | MCP protocol, rule-driven tool exposure and routing, audit, response caching, and memory tools |
 | `vrules-rules-component` | GRL loading, canonical forward evaluation, validation, proof, Git revisions, diff, comparison, and fast-forward promotion |
-| `vrules-storage-component` | Append-only audit, memory, and cache segments with model-revision-aware vector search |
+| `vrules-storage-component` | Append-only audit, memory, and response-cache events with model-revision-aware vector search |
+| [`vrules-cache-component`](crates/vrules-cache-component) | Append-only, content-addressed embedding vectors, epoch invalidation, and the local store for the `vrules-rest` cache tier |
 | `vrules-admin-component` | Admin RPC, what-if, A/B evaluation, rules governance, memory inspection, and embedding diagnostics |
 | `vrules-gcp-component` | Optional Vertex/Gemini provider with guest-owned ADC and credentials |
 | `vrules-embedding-wllama` | Configurable GGUF embedding inference through pinned wllama/llama.cpp; EmbeddingGemma is the default model |
 
 `release/vrules-components.json` declares component paths, configuration,
-preopens, HTTP allowlists, and the admin plugin. Components can be replaced
-without changing the native executable or the shared WIT contract.
+preopens, HTTP allowlists, and the admin and cache plugins. Components can be
+replaced without changing the native executable or the shared WIT contract.
 
-## Rules, memory, and governance
+## Embedding cache and organizational memory
+
+`vrules-cache-component` is a persistent embedding accelerator, not an
+in-process memoization map. In a component deployment, embedding requests from
+rule evaluation, `memory_write`, `memory_update`, `memory_search`, diagnostics,
+and the `vrules-rest` routes all reach the real embedding model through the
+same cache-through host path:
+
+```text
+local cache -> optional parent vrules-rest tier -> embedding inference
+     ^                                              |
+     +------------------- write-back ---------------+
+```
+
+The content key combines the embedding-model revision, canonicalization
+namespace, and text content. Identical text therefore reuses one vector within
+the same model and canonicalization contract. Changing the model revision or
+supplying a new canonicalization namespace selects a different keyspace instead
+of serving stale coordinates. A local miss can pull from a configured parent
+tier; only a miss at every tier runs inference. Newly computed vectors are
+written locally and, when configured, back to the parent so other nodes can
+reuse them.
+
+Cache entries are append-only. Expiration appends an epoch change and makes
+older generations non-live rather than deleting their records, so cache state
+remains reconstructable. Cache failures are treated as misses on the embedding
+path: they may cost an inference, but they do not change the resulting vector
+or fail a rule or memory operation. The
+[`vrules-rest` API](crates/vrules-shim/README.md#vrules-rest) also exposes
+immutable hash lookups, compute-on-miss requests, lossless f32 vector bodies,
+strong ETags, write-up, expiration, and cache statistics.
+
+Organizational memory and the embedding cache have separate responsibilities:
+
+| | Organizational memory | Embedding cache |
+|---|---|---|
+| **Stores** | Governed facts, tags, source, supersession and tombstone events, vectors, and model identity | Derived vectors keyed by model, canonicalization namespace, and text |
+| **Lifecycle** | Writes, corrections, and deletes append events so history remains auditable | Puts and epoch invalidations append records; entries can be regenerated |
+| **Role** | Source of durable, policy-controlled recall | Shared accelerator for producing semantic evidence |
+
+Updates and deletes append supersession and tombstone events rather than
+altering prior memory. Audit and memory history therefore remain
+reconstructable, and vector events carry model identity so recall never crosses
+incompatible model revisions.
+
+A memory write or update embeds the fact once and stores that vector with the
+append-only event. A search embeds its query once and compares it with the
+stored vectors; it does not re-embed the memory collection. Repeated facts,
+queries, rule literals, and cross-agent requests reuse cached vectors, while
+model identity prevents recall across incompatible vector spaces.
+
+This removes duplicate GGUF forward passes from the common path, reducing
+latency, CPU or GPU utilization, energy use, and the infrastructure cost of
+organizational recall. A deployment using a compatible metered embedding
+provider also avoids duplicate billable inference calls. Parent cache tiers
+extend the same savings across processes and machines without turning the cache
+into the memory system of record.
+
+## Rules and governance
 
 `shared-rules/` contains reusable rule sets and schemas. The rules component
 reads the active working tree and can also evaluate Git branches, tags, or
@@ -313,29 +373,30 @@ commit IDs. The admin surface supports revision-aware listing, diff, comparison,
 what-if evaluation, A/B runs, and promotion with explicit sign-off and
 fast-forward enforcement.
 
-Updates and deletes in memory are appended as new events. Audit and memory
-history remain reconstructable, and vector events carry model identity so
-recall never crosses incompatible model revisions.
+Production traces and audit events retain the active rule revision and decision
+evidence, tying runtime behavior back to the reviewed policy source.
 
-## Reference implementation: address verification
+## Reference examples
 
-Address verification is deliberately a **reference implementation**, not a
-business domain built into the core framework. It proves that generic
-vector-rules execution can combine unstructured and structured inputs, native
-functions, canonicalization, embeddings, local indexes, reference evidence, and
-editable organizational policy in one auditable rule flow.
+The standalone [`apps/examples`](apps/examples) application is a suite of
+executable capability demonstrations. The suite runs the Rust rule engine in
+the browser, and its semantic examples use real EmbeddingGemma vectors:
 
-The PWA runs the reference workflow through `vrules-wasm` with the same
-structured facts and `shared-rules/address/*.grl` policy consumed by native
-hosts. The fact and rule contracts are host-neutral so streaming and batch
-adapters do not require separate business-rule implementations. Columnar
-adapter work is tracked in [the roadmap](docs/ROADMAP.md).
+| Example | What it demonstrates |
+|---|---|
+| **Address verification** | Structured and unstructured input, native functions, canonicalization, embeddings, local reference indexes, and editable organizational policy in one auditable flow |
+| **Semantic rules** | Similarity and contrast measurements, return-kind enforcement, and forward chaining from embedding evidence into deterministic facts |
+| **Fraud triage** | Calibrated axes and fitted regions combined with hard facts such as payee status and amount |
+| **Streaming** | Sequential one-event/one-result rule processing with throughput and decision output |
+| **Proof** | Backward chaining with provability, missing facts, and a visible proof tree |
 
-Address-oriented crates and the co-located `vrules-core::address`
-module support this executable reference workflow. They are not framework
-semantics, required runtime components, or a commitment to make address
-verification part of the generic core API. Example identities and fixtures stay
-under the isolated console example.
+Address verification is one reference workflow in this suite, not a framework
+business domain. Its PWA and native hosts consume the same structured facts and
+`shared-rules/address/*.grl` policy. Address-oriented crates and
+`vrules-core::address` support that example without becoming required runtime
+components or core rule semantics. The
+[browser examples gallery](docs/EXAMPLES.md) provides screenshots and a
+walkthrough of every example.
 
 ## Core libraries and console
 
@@ -381,14 +442,16 @@ cargo build --workspace \
   --exclude vrules-storage-component \
   --exclude vrules-rules-component \
   --exclude vrules-admin-component \
-  --exclude vrules-gcp-component
+  --exclude vrules-gcp-component \
+  --exclude vrules-cache-component
 
 cargo build --target wasm32-wasip2 \
   -p vrules-runtime-component \
   -p vrules-storage-component \
   -p vrules-rules-component \
   -p vrules-admin-component \
-  -p vrules-gcp-component
+  -p vrules-gcp-component \
+  -p vrules-cache-component
 ```
 
 The wllama component additionally requires wasi-sdk 33, `wit-bindgen-cli`
@@ -428,6 +491,7 @@ release/       component manifests, build scripts, and packaging
 ## Documentation
 
 - [Browser examples gallery](docs/EXAMPLES.md)
+- [Runtime and `vrules-rest` API](crates/vrules-shim/README.md)
 - [Core design](crates/vrules-core/docs/DESIGN.md)
 - [Feature coverage](crates/vrules-core/docs/FEATURE-COVERAGE.md)
 - [Shared rule packs](shared-rules/README.md)
