@@ -3,9 +3,10 @@
 **vector-rules defines an effective production role for LLMs while exposing the
 power of embeddings to every layer of the technology stack.**
 
-A deterministic, local-first policy engine for AI agents and MCP: Git-governed
-guardrails, audited organizational memory, pluggable GGUF embeddings, and
-portable WASM components in Rust.
+vector-rules turns meaning found in documents, messages, events, and records
+into deterministic, governed decisions. It combines embeddings, which measure
+semantic relationships in content, with a rules engine, which applies explicit
+organizational policy to those measurements and ordinary application facts.
 
 LLMs are good at interpreting language, generating candidates, and explaining
 complex information. They are not, by themselves, a reviewable source of
@@ -19,6 +20,69 @@ application, evaluate stateful streams, and power browser-side what-if analysis
 through WebAssembly. Organizations keep their policy in git and can move it
 across models, clients, and deployment environments without depending on a
 proprietary control plane.
+
+## What is a rules engine?
+
+A rules engine applies **declarative policy** to facts. Conventional application
+code describes a fixed sequence of calls and branches: first do this, then test
+that, then choose a path. A rule instead states only the policy relationship:
+**when these facts are true, derive this fact or take this action**. The engine
+determines which rules apply, adds their conclusions to the working facts, and
+continues evaluating until no rule can derive another conclusion.
+
+This forward chaining automatically wires simple, independently understandable
+policies into complex behavior. Rules do not call one another or need to know
+the complete workflow. They connect through the facts they consume and produce:
+
+| Simple policy | Fact or decision it produces |
+|---|---|
+| Language in a document expresses unusual urgency or pressure | `urgent_request` |
+| A payment has a new payee and exceeds an amount threshold | `elevated_payment_risk` |
+| A request is urgent and has elevated payment risk | `manual_review_required` |
+| Manual review is required | Hold the payment and record the reason |
+
+Each policy remains small, but together they produce a multi-stage decision.
+There is no hard-coded orchestration between the first rule and the last. The
+document and its surrounding context supply the facts that connect the policy
+graph, so different content naturally assembles a different decision path.
+Adding a new policy can extend that graph without rewriting a central decision
+tree or prompt.
+
+This is the advantage of **policy as code**:
+
+- **Composable:** small policies combine through shared facts instead of a
+  growing web of application-specific branches.
+- **Content-driven:** the applicable policy path follows the document rather
+  than forcing every document through one predefined workflow.
+- **Explainable:** a trace shows each input fact, fired rule, derived fact, and
+  final decision.
+- **Governable:** policy can be reviewed, tested, versioned, promoted, and
+  rolled back in git.
+- **Reusable:** the same policy and fact model can run across applications,
+  agents, streams, batch jobs, and browsers.
+
+## What are embeddings?
+
+An embedding model converts content into a fixed-length list of numbers called
+a **vector**. That vector represents patterns of meaning learned by the model.
+Content with related meaning tends to produce vectors that are close together,
+even when it uses different words or comes from differently named fields.
+
+This makes embeddings useful wherever exact keywords and rigid schemas are too
+brittle. For example, they can recognize that `ship_to`, `delivery address`,
+and `destination` probably describe the same kind of field, or measure whether
+a message sounds more urgent and pressured than routine and flexible.
+
+Embeddings are measurements, not decisions. A similarity score does not know
+whether an organization should accept an address, hold a payment, expose a
+tool, or recall a memory. vector-rules turns those measurements into governed
+evidence: rules combine semantic relationships with exact values, context,
+state, and organizational policy before taking action.
+
+The project uses real embedding models and tracks model identity so evidence is
+not silently mixed across incompatible vector spaces. Content-addressed caches
+reuse vectors for repeated content, allowing the same semantic evidence to
+serve rule evaluation, memory, applications, streams, and browser analysis.
 
 ## Vision
 
@@ -41,17 +105,26 @@ Semantic similarity becomes evidence inside a deterministic rule network, where
 it can gate conditions, derive facts, select tools, route requests, and control
 memory recall.
 
+### The role of LLMs
+
+vector-rules is not anti-LLM; it gives LLMs a bounded role that plays to their
+strengths. An LLM can translate policy intent into candidate rules, propose
+edge-case facts, explain diffs and traces, summarize audit history, and prepare
+rollout notes. Schema validation, rule parsing and evaluation, stream state,
+proof, pinned rule revisions, and audit records remain the reviewable source of
+runtime truth.
+
 ### Operating principles
 
-- **Deterministic production behavior.** `vrules-core` evaluates GRL through the
-  canonical `RustRuleEngine` rather than an opaque reasoning loop. Forward
-  evaluation returns execution traces; backward chaining can prove a goal and
-  return its proof tree.
+- **Deterministic production behavior.** The canonical rule engine, rather than
+  an opaque reasoning loop, makes decisions. Forward evaluation returns
+  execution traces; backward chaining can prove a goal and return its proof
+  tree.
 - **Governed organizational memory.** Embeddings are canonicalized,
   content-addressed, cached, and reused. Recall can be controlled by policy and
   recorded with provenance instead of existing only as transient prompt
   context.
-- **One policy surface across runtimes.** The same GRL rules drive MCP tool
+- **One policy surface across runtimes.** The same rules drive MCP tool
   exposure, request routing, embedded application behavior, sequential stream
   processing, and browser what-if analysis.
 - **GitOps governance.** Every deployed decision can be tied to the exact rules
@@ -62,75 +135,17 @@ memory recall.
   and can register native Rust functions without coupling rule semantics to a
   transport or model vendor.
 
-### The role of LLMs
-
-vector-rules is not anti-LLM; it gives LLMs a bounded role that plays to their
-strengths. An LLM can translate policy intent into candidate rules, propose
-edge-case facts, explain diffs and traces, summarize audit history, and prepare
-rollout notes. Schema validation, GRL parsing, engine firing, stream state,
-proof, pinned rule revisions, and audit records remain the reviewable source of
-runtime truth.
-
-## What is a rules engine?
-
-A rules engine applies **declarative policy** to facts. Conventional application
-code describes a fixed sequence of calls and branches: first do this, then test
-that, then choose a path. A rule instead states only the policy relationship:
-**when these facts are true, derive this fact or take this action**. The engine
-determines which rules apply, adds their conclusions to the working facts, and
-continues evaluating until those conclusions no longer activate more rules.
-
-This forward chaining automatically wires simple, independently understandable
-policies into complex behavior. Rules do not call one another or need to know
-the complete workflow. They connect through the facts they consume and produce:
-
-| Simple policy | Fact or decision it produces |
-|---|---|
-| Language in a document expresses unusual urgency or pressure | `urgent_request` |
-| A payment has a new payee and exceeds an amount threshold | `elevated_payment_risk` |
-| A request is urgent and has elevated payment risk | `manual_review_required` |
-| Manual review is required | Hold the payment and record the reason |
-
-Each policy remains small, but together they produce a multi-stage decision.
-There is no hard-coded orchestration between the first rule and the last. The
-document and its surrounding context supply the facts that connect the policy
-graph, so different content naturally activates a different path. Adding a new
-policy can extend that graph without rewriting a central decision tree or
-prompt.
-
-In vector-rules, facts can come from structured fields, unstructured document
-content, canonicalization, embeddings, application state, prior events, and
-organizational context. Semantic evidence can therefore enter the same
-deterministic chain as exact values: embeddings interpret what the content
-means, while explicit rules decide what that meaning permits or requires.
-
-This is the advantage of **policy as code**:
-
-- **Composable:** small policies combine through shared facts instead of a
-  growing web of application-specific branches.
-- **Content-driven:** the applicable policy path follows the document rather
-  than forcing every document through one predefined workflow.
-- **Explainable:** a trace shows each input fact, fired rule, derived fact, and
-  final decision.
-- **Governable:** policy can be reviewed, tested, versioned, promoted, and
-  rolled back in git.
-- **Reusable:** the same policy and fact model can run across applications,
-  agents, streams, batch jobs, and browsers.
-
 ## From input to decision
 
 A complete vector-rules decision path can use the following stages:
 
 1. A host turns a request, message, event, or record into facts.
-2. When applicable, registered canonical functions such as `s_canon_match` and
-   `m_canon_label` normalize recurring variants, identify structural
-   near-duplicates, and stabilize keys.
-3. When meaning is needed, registered vector functions such as `s_cosine`,
-   `s_contrast`, and the artifact-backed `c_project` / `b_member` resolve
-   semantic evidence through the embedding layer. Content-addressed caches
-   avoid recomputing the same embeddings.
-4. `RustRuleEngine` combines those results with ordinary facts and state, then
-   fires matching rules and forward-chains over derived facts.
+2. Canonicalization normalizes recurring variants, identifies structural
+   near-duplicates, and stabilizes keys.
+3. When meaning is needed, the embedding layer turns semantic relationships
+   into evidence. Content-addressed caches avoid recomputing the same vectors.
+4. The rule engine combines that evidence with ordinary facts and state, fires
+   matching rules, and forward-chains over derived facts.
 5. Rules produce an explicit decision: expose a tool, select a provider, recall
    memory, route a request, write a value, or update stream state.
 6. The host records the decision, trace, active rules revision, and relevant
@@ -141,7 +156,44 @@ semantic reasoning for cases that need it. Vector search is not bolted onto the
 side of the engine: canonical and vector expressions participate directly in
 rule evaluation.
 
-### Embeddings inside deterministic rules
+## Where the same policy applies
+
+| Use case | How vector-rules applies |
+|---|---|
+| **Agent and MCP mediation** | Use connection and request facts to expose allowed tools, choose providers, and audit execution. |
+| **Organizational memory** | Control what can be written or recalled while preserving model identity and searchable provenance. |
+| **Applications and batch jobs** | Apply the same decisions to individual requests or large collections of structured records and documents. |
+| **Streaming workloads** | Evaluate sequential events with windows, watermarks, joins, and state. |
+| **Browser analysis** | Validate policy, run what-if scenarios, compare outcomes, and inspect proofs locally. |
+
+## Reference examples
+
+The standalone [`apps/examples`](apps/examples) application is a suite of
+executable capability demonstrations. The suite runs the Rust rule engine in
+the browser, and its semantic examples use real EmbeddingGemma vectors:
+
+| Example | What it demonstrates |
+|---|---|
+| **Address verification** | Structured and unstructured input, native functions, canonicalization, embeddings, local reference indexes, and editable organizational policy in one auditable flow |
+| **Semantic rules** | Similarity and contrast measurements, return-kind enforcement, and forward chaining from embedding evidence into deterministic facts |
+| **Fraud triage** | Calibrated axes and fitted regions combined with hard facts such as payee status and amount |
+| **Streaming** | Sequential one-event/one-result rule processing with throughput and decision output |
+| **Proof** | Backward chaining with provability, missing facts, and a visible proof tree |
+
+Address verification is one reference workflow in this suite, not a framework
+business domain. Its PWA and native hosts consume the same structured facts and
+`shared-rules/address/*.grl` policy. Address-oriented crates and
+`vrules-core::address` support that example without becoming required runtime
+components or core rule semantics. The
+[browser examples gallery](docs/EXAMPLES.md) provides screenshots and a
+walkthrough of every example.
+
+![Semantic similarity over EmbeddingGemma vectors with a forward-chaining trace, running in the browser](docs/examples-semantic.png)
+
+The remaining sections describe how these capabilities are implemented and
+packaged.
+
+## Embeddings inside deterministic rules
 
 GRL calls vector operations as ordinary registered functions, so embedding
 measurements participate in the same condition evaluation as scalar facts. The
@@ -234,26 +286,6 @@ the cache identity. Persistent deployments can set `model_path`, `model`,
 `model_sha256`, and the `/models` preopen in `vrules-components.json`. Models
 without pooling metadata can set `pooling` to `mean`, `cls`, or `last`.
 
-The semantic-rules example in [`apps/examples`](apps/examples) demonstrates
-layered similarity, contrast, and forward chaining from semantic evidence into
-deterministic facts. It runs entirely in the browser with embeddings on WebGPU
-or CPU. The [browser examples gallery](docs/EXAMPLES.md) covers the complete
-reference suite.
-
-![Semantic similarity over EmbeddingGemma vectors with a forward-chaining trace, running in the browser](docs/examples-semantic.png)
-
-### What one policy layer can govern
-
-| Use case | How vector-rules applies |
-|---|---|
-| **Agent and MCP mediation** | The runtime and rules components use connection and request facts to expose allowed tools, choose providers, and audit execution. |
-| **Organizational memory** | Append-only storage, `em-log-n`, and `vrules-canon` provide model-aware vectors, policy-controlled recall, and searchable provenance. |
-| **Reference workflows** | Browser examples combine rules, native functions, embeddings, indexes, and organizational policy without adding application domains to the framework. |
-| **Application decisions** | Rust hosts parse GRL into `Ruleset` and evaluate structured `Facts` through `RustRuleEngine`. |
-| **Streaming workloads** | The upstream synchronous `StreamProcessor` provides one-event/one-result processing with windows, watermarks, joins, state, and the optional upstream Redis-backed `StateStore`. |
-| **Browser analysis** | `vrules-wasm` runs GRL validation, forward evaluation, reference workflows, and backward proof with native Rust semantics. |
-| **Policy authoring and review** | `shared-rules` keeps reusable GRL packs and shared fact schemas in git. |
-
 ## Architecture
 
 `vrules-shim` is the only native runtime executable. It hosts independently
@@ -292,17 +324,13 @@ The component manifest is the deployment boundary: it selects implementations,
 configuration, filesystem preopens, and HTTP allowlists without adding private
 component IPC protocols. `wit/vrules.wit` remains backend-neutral.
 
-### Engine compatibility
-
-vector-rules uses rust-rule-engine as its engine of record. The fork stays
-consistent with the originating project wherever possible so upstream parser,
-runtime, and evaluator improvements can roll forward without a translation
-layer. General engine fixes remain upstream-compatible fork changes; vector,
-canonicalization, address, MCP, and product behavior use the engine's existing
-extension APIs. The core design records the required deviation policy in
-[`crates/vrules-core/docs/DESIGN.md`](crates/vrules-core/docs/DESIGN.md).
-
 ### GitOps and runtime lifecycle
+
+`shared-rules/` contains reusable rule sets and schemas. The rules component
+reads the active working tree and can also evaluate Git branches, tags, or
+commit IDs. The admin surface supports revision-aware listing, diff, comparison,
+what-if evaluation, A/B runs, and promotion with explicit sign-off and
+fast-forward enforcement.
 
 ```mermaid
 sequenceDiagram
@@ -334,7 +362,19 @@ sequenceDiagram
 Candidate rules can be tested in the browser, reviewed and promoted through git,
 then executed by the same native rule kernel in the rules component. Forward
 traces and backward proof explain decisions without asking a model to reconstruct
-the reasoning afterward.
+the reasoning afterward. Production traces and audit events retain the active
+rule revision and decision evidence, tying runtime behavior back to the reviewed
+policy source.
+
+### Engine compatibility
+
+vector-rules uses rust-rule-engine as its engine of record. The fork stays
+consistent with the originating project wherever possible so upstream parser,
+runtime, and evaluator improvements can roll forward without a translation
+layer. General engine fixes remain upstream-compatible fork changes; vector,
+canonicalization, address, MCP, and product behavior use the engine's existing
+extension APIs. The core design records the required deviation policy in
+[`crates/vrules-core/docs/DESIGN.md`](crates/vrules-core/docs/DESIGN.md).
 
 ## Components
 
@@ -410,39 +450,6 @@ organizational recall. A deployment using a compatible metered embedding
 provider also avoids duplicate billable inference calls. Parent cache tiers
 extend the same savings across processes and machines without turning the cache
 into the memory system of record.
-
-## Rules and governance
-
-`shared-rules/` contains reusable rule sets and schemas. The rules component
-reads the active working tree and can also evaluate Git branches, tags, or
-commit IDs. The admin surface supports revision-aware listing, diff, comparison,
-what-if evaluation, A/B runs, and promotion with explicit sign-off and
-fast-forward enforcement.
-
-Production traces and audit events retain the active rule revision and decision
-evidence, tying runtime behavior back to the reviewed policy source.
-
-## Reference examples
-
-The standalone [`apps/examples`](apps/examples) application is a suite of
-executable capability demonstrations. The suite runs the Rust rule engine in
-the browser, and its semantic examples use real EmbeddingGemma vectors:
-
-| Example | What it demonstrates |
-|---|---|
-| **Address verification** | Structured and unstructured input, native functions, canonicalization, embeddings, local reference indexes, and editable organizational policy in one auditable flow |
-| **Semantic rules** | Similarity and contrast measurements, return-kind enforcement, and forward chaining from embedding evidence into deterministic facts |
-| **Fraud triage** | Calibrated axes and fitted regions combined with hard facts such as payee status and amount |
-| **Streaming** | Sequential one-event/one-result rule processing with throughput and decision output |
-| **Proof** | Backward chaining with provability, missing facts, and a visible proof tree |
-
-Address verification is one reference workflow in this suite, not a framework
-business domain. Its PWA and native hosts consume the same structured facts and
-`shared-rules/address/*.grl` policy. Address-oriented crates and
-`vrules-core::address` support that example without becoming required runtime
-components or core rule semantics. The
-[browser examples gallery](docs/EXAMPLES.md) provides screenshots and a
-walkthrough of every example.
 
 ## Core libraries and console
 
