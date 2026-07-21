@@ -1,0 +1,15 @@
+[package]
+name = "vrules-address-libpostal"
+version = "0.1.0"
+edition = "2024"
+description = "Optional libpostal adapter for the vector-rules address reference workflow."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ops-ping/vector-rules"
+publish = false
+
+[features]
+default = []
+native = []
+
+[dependencies]
+vrules-core = { workspace = true }

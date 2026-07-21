@@ -1,0 +1,1 @@
+{"name":"vector-rules admin console","short_name":"vrules","description":"Git-governed MCP policy, AI agent memory, embeddings, and browser WASM rules.","start_url":"./","display":"standalone","background_color":"#0d1117","theme_color":"#0d1117","lang":"en","scope":"./","icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}

@@ -1,0 +1,7 @@
+node_modules/
+.vite/
+*.log
+
+# NOTE: dist/ is intentionally NOT ignored — the native shim embeds it via
+# include_dir! at compile time, so the built bundle is committed. Refresh it
+# with `npm run build` after changing anything under src/.

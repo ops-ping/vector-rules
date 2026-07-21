@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Pre-push gate: run the local mirror of GitHub CI before anything reaches the
+# remote. Enable once per clone with:  git config core.hooksPath .githooks
+# Bypass in a pinch with:  git push --no-verify
+set -euo pipefail
+exec "$(git rev-parse --show-toplevel)/scripts/ci-check.sh"

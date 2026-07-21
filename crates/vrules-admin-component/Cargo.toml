@@ -1,0 +1,17 @@
+[package]
+name = "vrules-admin-component"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "WASI governance console backend for policy testing, audit, agent memory, and Git promotion."
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+wit-bindgen = { workspace = true }

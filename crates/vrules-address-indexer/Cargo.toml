@@ -1,0 +1,19 @@
+[package]
+name = "vrules-address-indexer"
+version.workspace = true
+edition = "2021"
+description = "Builds address-index snapshots and patches for the vector-rules reference workflow."
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies]
+blake3 = { workspace = true }
+csv = "=1.4.0"
+em-log-n = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+vrules-core = { path = "../vrules-core", default-features = false, features = ["embeddings"] }
+
+[dev-dependencies]
+tempfile = "=3.27.0"

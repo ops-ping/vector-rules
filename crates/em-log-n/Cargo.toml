@@ -1,0 +1,61 @@
+[package]
+name = "em-log-n"
+version = "0.0.1"
+edition = "2021"
+rust-version = "1.90"
+license = "Apache-2.0"
+description = "Embedded, latency-first searchable log store: fjall + usearch + reverse-ts keys."
+repository = "https://github.com/ops-ping/em-log-n"
+keywords = ["log", "vector-search", "embedded", "lsm", "usearch"]
+categories = ["database-implementations"]
+
+[lib]
+name = "em_log_n"
+path = "src/lib.rs"
+
+[features]
+# Default keeps the build light (trait scaffolding only) so downstream consumers
+# don't pull the C++/llama/fjall/usearch graph unless they opt in. `cargo test`
+# still exercises `full` via the self dev-dependency below — no flags needed.
+default = []
+fjall-backend = ["dep:fjall"]
+usearch-backend = ["dep:usearch"]
+codec-prost = ["dep:prost"]
+codec-rkyv = ["dep:rkyv"]
+coldtier-cloud = ["dep:object_store", "dep:reqwest", "dep:tokio", "dep:futures", "dep:url"]
+full = [
+    "fjall-backend",
+    "usearch-backend",
+    "codec-prost",
+    "codec-rkyv",
+    "coldtier-cloud",
+]
+
+# Pinned to the EXACT minor.patch we have tested with so a future cargo update
+# (or a downstream lockfile-less build) can't silently pull a non-tested
+# version. Each version bump is a deliberate code-review change. See
+# `plan.md` / `files/storage-recommendation.md` for the substrate rationale.
+[dependencies]
+thiserror = "=2.0.18"
+blake3 = "=1.8.5"
+# Pure-Rust canonicalization (no C++/heavy graph) — always on. Enables the
+# `json` strategies so structured payloads canonicalize without a feature dance.
+vrules-canon = { path = "../vrules-canon", features = ["json"] }
+fjall = { version = "=3.1.5", optional = true }
+usearch = { version = "=2.25.3", default-features = false, optional = true }
+prost = { version = "=0.13.5", optional = true, default-features = false, features = ["derive", "std"] }
+rkyv = { version = "=0.8.16", optional = true, default-features = false, features = ["std", "bytecheck"] }
+object_store = { version = "=0.14.0", optional = true, default-features = false, features = ["aws-base", "azure-base", "gcp-base", "reqwest", "ring"] }
+reqwest = { version = "=0.13.4", optional = true, default-features = false, features = ["rustls-no-provider"] }
+tokio = { version = "=1.52.3", optional = true, default-features = false, features = ["rt"] }
+futures = { version = "=0.3.31", optional = true, default-features = false, features = ["std"] }
+url = { version = "=2.5.8", optional = true }
+
+[dev-dependencies]
+proptest = "=1.11.0"
+tempfile = "=3.27.0"
+# Self dev-dependency so `cargo test` (and examples) build with `full` without
+# requiring flags.
+em-log-n = { path = ".", features = ["full"] }
+# NOTE: the [profile.release] settings live in the workspace-root Cargo.toml
+# (only the root's profile is honored in a workspace).

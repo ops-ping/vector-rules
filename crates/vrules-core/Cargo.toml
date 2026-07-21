@@ -1,0 +1,37 @@
+[package]
+name = "vrules-core"
+version = "0.1.0"
+edition = "2024"
+description = "Deterministic Rust RETE policy engine with pluggable embeddings, canonicalization, forward chaining, and proof."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ops-ping/vector-rules"
+readme = "README.md"
+keywords = ["policy-engine", "rules-engine", "rete", "embeddings", "ai-agents"]
+categories = ["data-structures", "algorithms"]
+publish = false
+
+[features]
+# vrules is an embedding-based reasoner: RETE evaluation, canonical matching, and ANN
+# semantic search. `embeddings` pulls em-log-n's `Embedder` trait (pure Rust, no
+# backend) and is on by default for native builds.
+# `--no-default-features --features rule-engine` is the wasm-buildable core.
+default = ["rule-engine", "embeddings"]
+rule-engine = ["dep:rust-rule-engine"]
+embeddings = ["dep:em-log-n"]
+
+# Versions pinned with `=` per the workspace convention (matches em-log-n / CONTRIBUTING.md).
+[dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.150"
+thiserror = "=2.0.18"
+tracing = "=0.1.44"
+rust-rule-engine = { version = "=1.20.3", optional = true, features = ["backward-chaining", "streaming-core"] }
+# Pure-Rust canonicalization (no llama/fjall): powers rule dedup / reasoning
+# heuristics (SimHash near-dup + canonical form). Always on. `json` enables the
+# structured-payload strategies. Local path; pinned-deps convention applies.
+vrules-canon = { path = "../vrules-canon", features = ["json"] }
+# vrules reuses em-log-n's `Embedder` trait so v: rules evaluate against the same
+# embedding stack the host builds. The trait is not feature-gated, so
+# default-features=false pulls only the trait. The Wasmtime host supplies vectors
+# from the wllama component.
+em-log-n = { path = "../em-log-n", default-features = false, optional = true }

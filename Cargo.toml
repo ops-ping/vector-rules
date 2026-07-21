@@ -1,0 +1,59 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+# apps/console (Svelte/Vite PWA) and shared-rules/ (GitOps rule data) are not crates.
+
+[workspace.package]
+version = "0.0.1-alpha.1"
+edition = "2024"
+rust-version = "1.94"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ops-ping/vector-rules"
+
+# All third-party versions are pinned with `=` per the workspace convention.
+[workspace.dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.150"
+thiserror = "=2.0.18"
+tracing = "=0.1.44"
+uuid = { version = "=1.18.1", features = ["v4"] }
+tokio = { version = "=1.52.3", features = ["rt-multi-thread", "macros", "net", "io-util", "io-std", "sync"] }
+axum = { version = "=0.8.4", features = ["ws"] }
+futures-util = { version = "=0.3.31", default-features = false, features = ["sink", "std"] }
+include_dir = "=0.7.4"
+mime_guess = "=2.0.5"
+# The WASI rules component needs revision, tree-diff, and SHA-1 repository support,
+# but not gix's process, signal, or network features.
+gix = { version = "=0.85.0", default-features = false, features = ["basic", "sha1"] }
+rust-rule-engine = { version = "=1.20.3", features = ["backward-chaining", "streaming-core"] }
+blake3 = "=1.8.5"
+sha2 = "=0.10.9"
+anyhow = "=1.0.102"
+reqwest = { version = "=0.13.4", default-features = false, features = ["blocking", "json", "rustls"] }
+wit-bindgen = "=0.59.0"
+wasmtime = { version = "=46.0.1", default-features = false, features = ["anyhow", "cache", "component-model", "cranelift", "gc-null", "parallel-compilation", "runtime", "std"] }
+wasmtime-wasi = { version = "=46.0.1", default-features = false, features = ["p2"] }
+# In-tree crates.
+vrules-core = { path = "crates/vrules-core", default-features = false, features = ["rule-engine", "embeddings"] }
+vrules-canon = { path = "crates/vrules-canon", features = ["json", "audit"] }
+em-log-n = { path = "crates/em-log-n", default-features = false, features = ["fjall-backend", "usearch-backend"] }
+
+# The public compatibility fork carries engine-level fixes while preserving the
+# upstream API. Cargo.lock pins the exact main-branch revision used by this tree.
+[patch.crates-io]
+rust-rule-engine = { git = "https://github.com/ops-ping/rust-rule-engine.git", branch = "main" }
+# crates.io object_store 0.14.0 still depends on vulnerable quick-xml 0.39.x;
+# this pinned upstream commit keeps the cloud cold-tier backend on quick-xml 0.41.x.
+object_store = { git = "https://github.com/apache/arrow-rs-object-store.git", rev = "fd44ebb9c1158660795ec22d7b11acf31c3fe113" }
+# WASI has no mmap syscall. Gitoxide only needs read-only maps here, so this
+# compatible crate reads immutable Git files into owned memory.
+memmap2 = { path = "vendor/memmap2-0.9.11" }
+# gix-tempfile uses process IDs only to distinguish post-fork ownership. WASI
+# cannot fork and does not implement std::process::id(), so use a fixed owner.
+gix-tempfile = { path = "vendor/gix-tempfile-23.0.2" }
+
+# Only the workspace-root release profile is honored (moved up from em-log-n).
+[profile.release]
+opt-level = 2
+codegen-units = 16
+lto = false

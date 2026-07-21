@@ -1,0 +1,7 @@
+{
+  "name": "embeddinggemma-300M-Q4_K_M",
+  "file": "embeddinggemma-300M-Q4_K_M.gguf",
+  "sha256": "676216d6d8abbd717688905a77230a213f9db095793ee8c1afb1aa5bf11eb531",
+  "dimensions": 768,
+  "canon": "default-v1"
+}

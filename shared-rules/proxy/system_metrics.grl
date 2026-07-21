@@ -1,0 +1,21 @@
+rule "ShedWhenCpuHigh" no-loop {
+    when
+        SystemMetrics.cpu_pct > 80
+    then
+        Decision.shed = true;
+        Decision.shed_reason = "CPU over threshold";
+}
+
+rule "DowngradeEffortWhenMemHigh" no-loop {
+    when
+        SystemMetrics.mem_pct > 90
+    then
+        Decision.effort = "low";
+}
+
+rule "AlertOnHighWriteIops" no-loop {
+    when
+        SystemMetrics.write_iops > 5000
+    then
+        Decision.alert = "write IOPS over threshold";
+}

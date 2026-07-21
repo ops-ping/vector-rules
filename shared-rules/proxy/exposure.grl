@@ -1,0 +1,26 @@
+rule "ExposeAllInFull" no-loop {
+    when
+        Exposure.context == "full"
+    then
+        Decision.exposed = true;
+}
+
+rule "ExposeMemoryGroup" no-loop {
+    when
+        Exposure.context == "memory" &&
+        Exposure.tool_group == "memory"
+    then
+        Decision.exposed = true;
+}
+
+rule "ExposeReasoningGroups" no-loop {
+    when
+        Exposure.context == "reasoning" &&
+        (
+            Exposure.tool_group == "rules" ||
+            Exposure.tool_group == "whatif" ||
+            Exposure.tool == "web_ground"
+        )
+    then
+        Decision.exposed = true;
+}

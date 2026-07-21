@@ -1,0 +1,21 @@
+[package]
+name = "vrules-gcp-component"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "WASI Vertex AI provider with guest-owned ADC authentication for governed MCP calls."
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+base64 = "=0.22.1"
+rsa = { version = "=0.9.10", features = ["sha2"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { version = "=0.10.9", features = ["oid"] }
+signature = "=2.2.0"
+wit-bindgen = { workspace = true }

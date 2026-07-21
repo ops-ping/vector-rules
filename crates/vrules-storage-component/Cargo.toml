@@ -1,0 +1,19 @@
+[package]
+name = "vrules-storage-component"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Append-only WASI storage for audited organizational memory, embedding caches, and rule events."
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+wit-bindgen = { workspace = true }

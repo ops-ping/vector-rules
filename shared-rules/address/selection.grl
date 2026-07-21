@@ -1,0 +1,58 @@
+rule "KingColaBrandOwnerBillToInvalid" salience 100 no-loop {
+    when
+        m_ref_match_name(AddressDecision.source_text, "customer") == "King Cola" &&
+        AddressDecision.role == "bill_to"
+    then
+        AddressDecision.policy_status = "invalid";
+        AddressDecision.policy_reason = "King Cola is the brand owner; bill-to must be a distributor account selected by context.";
+}
+
+rule "TristateColaKnownBillToException" salience 90 no-loop {
+    when
+        AddressDecision.customer == "Tristate Cola" &&
+        AddressDecision.role == "bill_to" &&
+        AddressDecision.standardized contains "111 East Cola Lane"
+    then
+        AddressDecision.policy_status = "accepted_by_policy";
+        AddressDecision.policy_reason = "Tristate Cola uses 111 East Cola Lane as its bill-to address even when postal confidence is not perfect.";
+}
+
+rule "CustomerMatchedFromReferenceData" salience 80 no-loop {
+    when
+        c_ref_match_score(AddressDecision.source_text, "customer") >= 450
+    then
+        AddressDecision.reference_status = "matched";
+}
+
+rule "CustomerNotFoundInReferenceData" salience 70 no-loop {
+    when
+        c_ref_match_count(AddressDecision.source_text, "customer") <= 0
+    then
+        AddressDecision.reference_status = "not_found";
+        AddressDecision.reference_name = "";
+}
+
+rule "ProductMatchedFromReferenceData" salience 60 no-loop {
+    when
+        c_ref_lexical_score(AddressDecision.source_text, "product") >= 450
+    then
+        AddressDecision.product_reference_matched = true;
+}
+
+rule "AddressFoundInLocalIndex" salience 20 no-loop {
+    when
+        c_addr_index_score(AddressDecision.standardized) >= 850 &&
+        AddressDecision.policy_status == "pending"
+    then
+        AddressDecision.policy_status = "valid_by_address_index";
+        AddressDecision.policy_reason = "Address matched the local OpenAddresses-style index.";
+}
+
+rule "PostalProfileInvalid" salience 10 no-loop {
+    when
+        AddressDecision.address_valid == false &&
+        b_addr_index_match(AddressDecision.standardized) == false
+    then
+        AddressDecision.policy_status = "invalid";
+        AddressDecision.policy_reason = "Address content does not satisfy the minimum postal profile.";
+}

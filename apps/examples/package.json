@@ -1,0 +1,29 @@
+{
+  "name": "vrules-examples",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Fully static, server-free demonstrations of the vrules browser runtime: in-browser EmbeddingGemma (wllama) plus the vrules-wasm rule engine, deployable to a plain object bucket.",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ops-ping/vector-rules.git"
+  },
+  "scripts": {
+    "build:wasm": "wasm-pack build ../../crates/vrules-wasm --target web --out-name vrules_wasm",
+    "predev": "npm run build:wasm",
+    "dev": "vite",
+    "prebuild": "npm run build:wasm",
+    "build": "vite build",
+    "preview": "vite preview",
+    "seed": "node scripts/seed-cache.mjs"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "7.1.2",
+    "svelte": "5.56.4",
+    "vite": "8.1.0"
+  },
+  "dependencies": {
+    "@noble/hashes": "^1.8.0"
+  }
+}

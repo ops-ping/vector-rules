@@ -1,0 +1,36 @@
+# cargo-deny configuration. Run with `cargo deny check`.
+# Advisory in CI (non-blocking) — see .github/workflows/ci.yml.
+
+[advisories]
+version = 2
+yanked = "warn"
+ignore = []
+
+[licenses]
+version = 2
+# The workspace is dual MIT/Apache-2.0; allow the common permissive set its deps use.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+    "MPL-2.0",
+    "CC0-1.0",
+    "0BSD",      # BSD Zero Clause (public-domain-equivalent permissive)
+    "BSL-1.0",   # Boost Software License (e.g. ryu, via serde_json)
+    "CDLA-Permissive-2.0", # Mozilla CA bundle data (webpki-roots, via rustls TLS)
+]
+confidence-threshold = 0.9
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"   # workspace pins exact `=` versions, not wildcards.
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "allow"   # the rust-rule-engine fork is patched in by git URL.
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

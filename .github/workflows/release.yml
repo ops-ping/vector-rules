@@ -1,0 +1,155 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build-components:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.0"
+          targets: wasm32-wasip2
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install pinned WASI tooling
+        run: |
+          set -euo pipefail
+          mkdir -p target/wasi-tools/share
+          curl -fL --retry 3 -o target/wasi-sdk.tar.gz \
+            https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-33/wasi-sdk-33.0-x86_64-linux.tar.gz
+          echo "0ba8b5bfaeb2adf3f29bab5841d76cf5318ab8e1642ea195f88baba1abd47bce  target/wasi-sdk.tar.gz" |
+            sha256sum -c -
+          tar -C target -xzf target/wasi-sdk.tar.gz
+          mv target/wasi-sdk-33.0-x86_64-linux target/wasi-sdk
+          cargo install wit-bindgen-cli --version 0.59.0 --locked --root target/wasi-tools
+          cargo install wasm-tools --version 1.253.0 --locked --root target/wasi-tools
+          curl -fL --retry 3 -o target/wasi-tools/share/wasi_snapshot_preview1.reactor.wasm \
+            https://github.com/bytecodealliance/wasmtime/releases/download/v46.0.1/wasi_snapshot_preview1.reactor.wasm
+          echo "0acb10959bd3c1d2e7903ef82212910bfc156ab5698ef3f2ff669474ba59fb0a  target/wasi-tools/share/wasi_snapshot_preview1.reactor.wasm" |
+            sha256sum -c -
+
+      - name: Build WASI components
+        run: ./release/build-components.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vrules-components
+          path: target/vrules-components/*
+
+  build-linux:
+    needs: build-components
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.0"
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: vrules-components
+          path: target/vrules-components
+
+      - name: Install cross
+        run: cargo install cross --locked
+
+      - name: Build Linux packages
+        env:
+          VRULES_SKIP_COMPONENT_BUILD: "1"
+        run: ./release/build.sh x86_64-unknown-linux-musl aarch64-unknown-linux-musl
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-linux
+          path: dist/*
+
+  build-macos-apple-silicon:
+    needs: build-components
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.0"
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: vrules-components
+          path: target/vrules-components
+
+      - name: Build macOS package
+        env:
+          VRULES_SKIP_COMPONENT_BUILD: "1"
+        run: ./release/build.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-macos-apple-silicon
+          path: dist/*
+
+  build-browser-wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.0"
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked
+
+      - name: Build browser package
+        run: ./release/build-wasm.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-browser-wasm
+          path: dist/*
+
+  publish:
+    needs: [build-linux, build-macos-apple-silicon, build-browser-wasm]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+
+      - name: Rebuild checksums
+        run: |
+          rm -f dist/SHA256SUMS
+          (cd dist && sha256sum ./* > SHA256SUMS)
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 ||
+            gh release create "${GITHUB_REF_NAME}" --prerelease \
+              --title "vrules ${GITHUB_REF_NAME}" \
+              --notes "Native Wasmtime shim, pluggable WASI components, and browser WASM package."
+          gh release upload "${GITHUB_REF_NAME}" dist/* --clobber

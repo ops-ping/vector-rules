@@ -1,0 +1,15 @@
+# Build configuration for the vrules workspace.
+#
+# The workspace is pure Rust — nothing here compiles llama.cpp or needs a Vulkan
+# SDK. Embeddings run in a separate prebuilt llama-server engine (a build-once
+# component); see CONTRIBUTING.md for installing it + the EmbeddingGemma model,
+# and release/ for the cross-build + packaging.
+
+# Cross-compile to the Android AVF Debian target with the GNU aarch64 linker.
+# Install on Debian/Ubuntu with: apt install gcc-aarch64-linux-gnu
+[target.aarch64-unknown-linux-gnu]
+linker = "aarch64-linux-gnu-gcc"
+
+# Optional shared compilation cache. Install sccache, then uncomment:
+# [build]
+# rustc-wrapper = "sccache"

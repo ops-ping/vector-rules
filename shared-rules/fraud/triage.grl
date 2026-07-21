@@ -1,0 +1,34 @@
+// Payment-request (BEC) triage: geometry artifacts supply calibrated features,
+// symbolic rules make the decision. Vector scores are evidence the rules
+// consume alongside hard checks - never a standalone gate.
+//
+// Requires artifacts: axis `urgency_pressure_v1` (calibrated), region
+// `bec_phrasing_v1`. Decision facts default to action = "approve".
+
+rule "HoldUrgentPressureNewPayee" salience 100 no-loop {
+    when
+        c_project(Payment.text, "urgency_pressure_v1") >= 90.0 &&
+        Payment.new_payee == true &&
+        Payment.amount >= 10000.0
+    then
+        Decision.action = "hold";
+        Decision.reason = "urgency-pressure language at or above the 90th percentile with a new payee and a large amount";
+}
+
+rule "HoldKnownBecPhrasing" salience 90 no-loop {
+    when
+        Decision.action != "hold" &&
+        b_member(Payment.text, "bec_phrasing_v1") == true &&
+        Payment.new_payee == true
+    then
+        Decision.action = "hold";
+        Decision.reason = "message falls inside the known BEC phrasing region and the payee is new";
+}
+
+rule "RecordEvidence" salience 10 no-loop {
+    when
+        Payment.text != ""
+    then
+        Payment.urgency_pct = c_project(Payment.text, "urgency_pressure_v1");
+        Payment.bec_depth = s_depth(Payment.text, "bec_phrasing_v1");
+}

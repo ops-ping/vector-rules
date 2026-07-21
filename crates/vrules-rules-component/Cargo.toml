@@ -1,0 +1,21 @@
+[package]
+name = "vrules-rules-component"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "WASI policy component for Git-governed rules, MCP exposure, RETE evaluation, traces, and proof."
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+em-log-n = { path = "../em-log-n", default-features = false }
+gix = { workspace = true }
+rust-rule-engine = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+vrules-core = { workspace = true }
+wit-bindgen = { workspace = true }

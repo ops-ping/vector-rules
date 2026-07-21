@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: fmt + clippy + build/test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.0"
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown,wasm32-wasip2
+
+      # Shared build/artifact caching (community convention; replaces hand-rolled actions/cache).
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Resolve workspace graph
+        # Proves the whole graph (incl. the public-fork rust-rule-engine patch) resolves.
+        run: cargo metadata --format-version 1 > /dev/null
+
+      # The Cargo workspace is pure Rust; the embedding engine is built as a
+      # separate WASI component in release jobs.
+      - name: Clippy (workspace)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Build (workspace)
+        run: >-
+          cargo build --workspace
+          --exclude vrules-runtime-component
+          --exclude vrules-storage-component
+          --exclude vrules-rules-component
+          --exclude vrules-admin-component
+          --exclude vrules-gcp-component
+
+      - name: Build WASI components
+        run: |
+          cargo build --target wasm32-wasip2 \
+            -p vrules-runtime-component \
+            -p vrules-storage-component \
+            -p vrules-rules-component \
+            -p vrules-admin-component \
+            -p vrules-gcp-component \
+            -p vrules-cache-component
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked
+
+      - name: Build wasm packages (web target)
+        run: |
+          wasm-pack build crates/vrules-wasm --target web --out-name vrules_wasm --release
+          wasm-pack build crates/em-log-n-wasm --target web --out-name em_log_n_wasm --release
+
+      - name: Test (cached real-embedding conformance)
+        # The committed fixture contains real EmbeddingGemma vectors and is reseeded
+        # through vrules-shim --daemon, so CI remains model-free without stubs.
+        run: >-
+          cargo test
+          -p vrules-canon
+          -p em-log-n
+          -p em-log-n-wasm
+          -p vrules-address-indexer
+          -p vrules-core
+          -p vrules-wasm
+          -p vrules-shim
+          -p vrules-cache-component
+
+  deny:
+    name: cargo-deny (advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check

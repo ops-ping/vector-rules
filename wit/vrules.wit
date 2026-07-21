@@ -1,0 +1,100 @@
+package ai:vrules@0.1.0;
+
+interface types {
+    record identity {
+        session-id: string,
+        child-session: option<string>,
+        process-id: string,
+        context: option<string>,
+    }
+
+    enum plugin-kind {
+        admin,
+        rules,
+        storage,
+        provider,
+    }
+
+    record plugin-descriptor {
+        id: string,
+        version: string,
+        kind: plugin-kind,
+        operations: list<string>,
+    }
+
+    record embedding-info {
+        id: string,
+        version: string,
+        model: string,
+        revision: string,
+        dimensions: u32,
+    }
+
+    record http-header {
+        name: string,
+        value: string,
+    }
+
+    record http-request {
+        method: string,
+        url: string,
+        headers: list<http-header>,
+        body: list<u8>,
+    }
+
+    record http-response {
+        status: u16,
+        headers: list<http-header>,
+        body: list<u8>,
+    }
+}
+
+interface host {
+    use types.{embedding-info, http-request, http-response};
+
+    invoke: func(plugin: string, operation: string, payload: string) -> result<string, string>;
+    get-embedding-info: func() -> result<embedding-info, string>;
+    embed: func(text: string) -> result<list<f32>, string>;
+    http: func(request: http-request) -> result<http-response, string>;
+    log: func(level: string, message: string);
+}
+
+interface plugin {
+    use types.{plugin-descriptor};
+
+    initialize: func(config: string) -> result<plugin-descriptor, string>;
+    invoke: func(operation: string, payload: string) -> result<string, string>;
+}
+
+interface embedding {
+    use types.{embedding-info};
+
+    initialize: func(config: string) -> result<embedding-info, string>;
+    embed: func(text: string) -> result<list<f32>, string>;
+}
+
+interface runtime {
+    use types.{identity, plugin-descriptor, embedding-info};
+
+    initialize: func(
+        config: string,
+        plugins: list<plugin-descriptor>,
+        embedding: embedding-info,
+    ) -> result<_, string>;
+    mcp: func(message: string, identity: identity) -> result<option<string>, string>;
+}
+
+world runtime-component {
+    import host;
+    export runtime;
+}
+
+world plugin-component {
+    import host;
+    export plugin;
+}
+
+world embedding-component {
+    import host;
+    export embedding;
+}

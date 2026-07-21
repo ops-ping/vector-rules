@@ -1,0 +1,28 @@
+[package]
+name = "vrules-wasm"
+version.workspace = true
+edition = "2021"
+description = "Browser WASM policy engine for GRL rules, semantic predicates, reference workflows, and proof."
+license = "MIT OR Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+# Pinned per the workspace convention. wasm-bindgen MUST equal the installed
+# wasm-bindgen-cli version (0.2.126) for a reproducible build.
+[dependencies]
+wasm-bindgen = "=0.2.126"
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.150"
+serde-wasm-bindgen = "=0.6.5"
+console_error_panic_hook = "=0.1.7"
+# The native GRL evaluator is reused so WASM and native share rule semantics.
+# No mcp-client is present because the browser has no stdio MCP transport.
+vrules-core = { path = "../vrules-core", default-features = false, features = ["rule-engine", "embeddings"] }
+# The Embedder trait (path-unified with vrules-core's em-log-n so the trait types match).
+em-log-n = { path = "../em-log-n", default-features = false }
+rust-rule-engine = { workspace = true }
+
+[dev-dependencies]
+wasm-bindgen-test = "=0.3.76"

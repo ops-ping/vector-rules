@@ -1,0 +1,14 @@
+rule "WebGroundSeen" no-loop {
+    when
+        Request.tool == "web_ground"
+    then
+        Decision.backend = "ai.vrules.grounding";
+        Decision.tool = "Ground";
+}
+
+rule "EscalateLongQuery" no-loop {
+    when
+        Request.query_len > 200
+    then
+        Decision.effort = "high";
+}

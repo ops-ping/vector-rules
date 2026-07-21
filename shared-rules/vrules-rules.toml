@@ -1,0 +1,16 @@
+# vrules-shared-rules — the canonical rule sets that ship with the various
+# products built on vrules. Generic and extensible; organized by product subdir.
+# Each product loads its own subdir plus `shared/`.
+
+[manifest]
+version = "0.1.0"
+description = "Git-governed policy packs for MCP, agent memory, runtime control, and portable reference workflows."
+
+# Products that consume this repo. The runtime component loads `proxy/` + `shared/`.
+[[products]]
+name = "proxy"
+loads = ["proxy", "shared"]
+
+[[products]]
+name = "address-example"
+loads = ["address", "shared"]

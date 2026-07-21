@@ -1,0 +1,32 @@
+rule "MeasureAddressFieldSimilarity" no-loop {
+    when
+        Field.name != ""
+    then
+        Field.address_sim = s_cosine(Field.name, "address");
+}
+
+rule "DetectAddressFieldByEmbedding" no-loop {
+    when
+        Field.address_sim >= 0.72
+    then
+        Field.semantic_type = "address";
+}
+
+rule "StandardizeValidAddress" no-loop {
+    when
+        b_addr_has_component(AddressText.raw, "road") == true &&
+        (
+            b_addr_has_component(AddressText.raw, "house_number") == true ||
+            b_addr_has_component(AddressText.raw, "postcode") == true ||
+            b_addr_has_component(AddressText.raw, "city") == true
+        )
+    then
+        standardize_address(AddressText.raw, "AddressText.standardized");
+}
+
+rule "AddressExistsInLocalIndex" no-loop {
+    when
+        b_addr_index_match(AddressText.standardized) == true
+    then
+        AddressText.index_status = "matched";
+}

@@ -1,0 +1,3 @@
+[submodule "vendor/wllama"]
+	path = vendor/wllama
+	url = https://github.com/ngxson/wllama.git

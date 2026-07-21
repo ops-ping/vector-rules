@@ -1,0 +1,6 @@
+rule "ClassifyShortLookup" no-loop {
+    when
+        Request.query_len < 40
+    then
+        Decision.classification = "short_lookup";
+}

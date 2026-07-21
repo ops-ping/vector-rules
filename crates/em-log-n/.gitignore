@@ -1,0 +1,13 @@
+# Rust build artifacts
+target/
+**/*.rs.bk
+
+# Atomic-write temp files from LocalDirStore
+*.tmp.*
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store

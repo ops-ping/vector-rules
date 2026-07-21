@@ -1,0 +1,84 @@
+{
+  "runtime": {
+    "path": "components/vrules-runtime.wasm",
+    "config": {
+      "rules_plugin": "rules",
+      "storage_plugin": "storage",
+      "cache_ttl_secs": 300
+    }
+  },
+  "embedding": {
+    "path": "components/vrules-embedding-wllama.wasm",
+    "config": {
+      "model_path": "/models/embeddinggemma-300M-F32.gguf",
+      "model": "EmbeddingGemma 300M F32",
+      "model_sha256": "a3125072128fc76d1c1d8d19f7b095c7e3bfbf00594dcf8a8bd3bcb334935d57",
+      "context_size": 2048
+    },
+    "preopens": [
+      {
+        "host": "models",
+        "guest": "/models",
+        "read_only": true
+      }
+    ]
+  },
+  "admin_plugin": "admin",
+  "cache_plugin": "cache",
+  "plugins": [
+    {
+      "id": "rules",
+      "path": "components/vrules-rules.wasm",
+      "config": {
+        "rules_dir": "/rules/shared-rules",
+        "directories": ["proxy"],
+        "tools_file": "proxy/tools.json",
+        "repository_dir": "/rules",
+        "repository_rules_path": "shared-rules"
+      },
+      "preopens": [
+        {
+          "host": "rules",
+          "guest": "/rules",
+          "read_only": false
+        }
+      ]
+    },
+    {
+      "id": "storage",
+      "path": "components/vrules-storage.wasm",
+      "config": {
+        "data_dir": "/data"
+      },
+      "preopens": [
+        {
+          "host": "data",
+          "guest": "/data",
+          "read_only": false
+        }
+      ]
+    },
+    {
+      "id": "admin",
+      "path": "components/vrules-admin.wasm",
+      "config": {
+        "rules_plugin": "rules",
+        "storage_plugin": "storage"
+      }
+    },
+    {
+      "id": "cache",
+      "path": "components/vrules-cache.wasm",
+      "config": {
+        "cache_dir": "/cache"
+      },
+      "preopens": [
+        {
+          "host": "cache",
+          "guest": "/cache",
+          "read_only": false
+        }
+      ]
+    }
+  ]
+}

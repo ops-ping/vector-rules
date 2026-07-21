@@ -1,0 +1,25 @@
+# cross-rs configuration for vrules release builds.
+#
+# The workspace is pure Rust, so the stock cross images suffice: they carry the
+# aarch64-linux-gnu GNU toolchain (incl. g++ for the C/C++ deps usearch + mdbx),
+# so the Rust *and* those C/C++ deps cross-compile at native speed — no qemu
+# emulation of the compile, and nothing here builds llama.cpp or needs Vulkan.
+#
+# Both release targets use the default images; listed explicitly for clarity.
+
+# The `:main` images track a recent Ubuntu, so the cross g++ is new enough to
+# compile the C++ deps (usearch's template-lambdas need g++ >= 11; the pinned
+# release `0.2.5` image ships g++ 9 and fails to parse them).
+[target.aarch64-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-gnu:main"
+
+[target.x86_64-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/x86_64-unknown-linux-gnu:main"
+
+# musl targets: statically linked, zero libc-version dependency — the release binaries
+# run on any Linux regardless of glibc age. `:main` carries g++ >= 11 for usearch's C++.
+[target.x86_64-unknown-linux-musl]
+image = "ghcr.io/cross-rs/x86_64-unknown-linux-musl:main"
+
+[target.aarch64-unknown-linux-musl]
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-musl:main"

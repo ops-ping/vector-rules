@@ -1,0 +1,26 @@
+[
+  {
+    "name": "web_ground",
+    "description": "Answer a question grounded in a live web search. Routed by rules to a backend; results are cached and audited.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": { "type": "string", "description": "The question to ground" },
+        "effort": { "type": "string", "enum": ["low", "high"], "description": "low = fast/cheap (default), high = deeper" }
+      },
+      "required": ["query"]
+    }
+  },
+  {
+    "name": "summarize",
+    "description": "Summarize the given content. Routed by rules to a backend (no web).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "content": { "type": "string", "description": "The content to summarize" },
+        "effort": { "type": "string", "enum": ["low", "high"], "description": "low = fast (default), high = deeper" }
+      },
+      "required": ["content"]
+    }
+  }
+]
