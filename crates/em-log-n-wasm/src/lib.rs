@@ -219,10 +219,10 @@ impl EmLogN {
         let mut hits = Vec::new();
         for row in self.rows.values() {
             let ts_nanos = parse_u64(&row.ts_nanos, "ts_nanos")?;
-            if let Some((lo, hi)) = window {
-                if ts_nanos < lo || ts_nanos >= hi {
-                    continue;
-                }
+            if let Some((lo, hi)) = window
+                && (ts_nanos < lo || ts_nanos >= hi)
+            {
+                continue;
             }
             let Some(vector) = row.vectors.get(index_name) else {
                 continue;

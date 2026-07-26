@@ -671,10 +671,10 @@ where
     let engine = ruleset
         .build_engine_with(|engine| {
             register_canon_functions(engine, canon_router);
-            if let Some(embedder) = embedder {
-                if let Err(error) = register_vector_functions(engine, embedder, artifacts) {
-                    registration_error = Some(error);
-                }
+            if let Some(embedder) = embedder
+                && let Err(error) = register_vector_functions(engine, embedder, artifacts)
+            {
+                registration_error = Some(error);
             }
             configure(engine);
         })

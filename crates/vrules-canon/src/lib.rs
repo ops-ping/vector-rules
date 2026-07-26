@@ -149,10 +149,10 @@ pub fn canonicalize(text: &str) -> CanonResult {
     let trimmed = text.trim_start();
     #[cfg(feature = "json")]
     {
-        if trimmed.starts_with('{') || trimmed.starts_with('[') {
-            if let Some(r) = JsonHybrid.try_canon(text) {
-                return r;
-            }
+        if (trimmed.starts_with('{') || trimmed.starts_with('['))
+            && let Some(r) = JsonHybrid.try_canon(text)
+        {
+            return r;
         }
     }
     let _ = trimmed;
