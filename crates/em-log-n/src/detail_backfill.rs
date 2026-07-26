@@ -19,9 +19,9 @@
 //! Both are interchangeable behind the [`DetailBackfill`] trait, so a deployment
 //! can start synchronous and switch to async without touching call sites.
 
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::mpsc::{sync_channel, SyncSender, TrySendError};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::mpsc::{SyncSender, TrySendError, sync_channel};
 use std::thread::JoinHandle;
 
 use crate::embed::Embedder;

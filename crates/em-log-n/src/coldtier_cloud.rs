@@ -53,10 +53,10 @@ use std::sync::Arc;
 
 use futures::StreamExt;
 use object_store::path::Path as OsPath;
+use object_store::{Error as OsError, ObjectStore as ArrowObjectStore, ObjectStoreExt, PutPayload};
 use object_store::{
     aws::AmazonS3Builder, azure::MicrosoftAzureBuilder, gcp::GoogleCloudStorageBuilder,
 };
-use object_store::{Error as OsError, ObjectStore as ArrowObjectStore, ObjectStoreExt, PutPayload};
 use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
 
 use crate::coldtier::ObjectStore;

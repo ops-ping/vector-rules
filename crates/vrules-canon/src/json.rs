@@ -16,7 +16,7 @@
 
 use serde_json::Value;
 
-use crate::mask::{is_variable, MASK};
+use crate::mask::{MASK, is_variable};
 use crate::{CanonMode, CanonResult, Canonicalizer};
 
 /// Hybrid JSON canonicalizer: keep string signal, mask variable scalars, sort

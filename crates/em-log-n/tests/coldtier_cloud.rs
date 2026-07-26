@@ -11,7 +11,7 @@
 
 use std::sync::Arc;
 
-use em_log_n::coldtier::{gc, publish_generation, restore_into, CloudStore, Manifest, ObjectStore};
+use em_log_n::coldtier::{CloudStore, Manifest, ObjectStore, gc, publish_generation, restore_into};
 use em_log_n::key::KeyBuilder;
 use em_log_n::shard::{DomainId, IndexSpec, Metric, Shard, ShardSpec};
 use object_store::memory::InMemory;

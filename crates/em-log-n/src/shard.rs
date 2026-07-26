@@ -103,7 +103,7 @@ mod engine {
 
     use super::{DomainId, IndexSpec, Metric, ShardSpec};
     use crate::error::{Error, Result};
-    use crate::key::{time_range_bytes, KeyParts, RowKey, DEFAULT_HASH_LEN};
+    use crate::key::{DEFAULT_HASH_LEN, KeyParts, RowKey, time_range_bytes};
 
     /// Capacity reserved for each usearch index on creation. Real usage is
     /// well below this — usearch grows dynamically — but reserving avoids

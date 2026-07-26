@@ -7,7 +7,7 @@
 //! contract of the store is broken, so it gets a proptest, not just a unit
 //! test.
 
-use em_log_n::key::{time_range_bytes, KeyBuilder, KeyParts, DEFAULT_HASH_LEN};
+use em_log_n::key::{DEFAULT_HASH_LEN, KeyBuilder, KeyParts, time_range_bytes};
 use proptest::prelude::*;
 
 proptest! {

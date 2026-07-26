@@ -10,7 +10,7 @@
 #![cfg(all(feature = "fjall-backend", feature = "usearch-backend"))]
 
 use em_log_n::coldtier::{
-    gc, publish_generation, restore_into, InMemoryStore, Manifest, ObjectStore,
+    InMemoryStore, Manifest, ObjectStore, gc, publish_generation, restore_into,
 };
 use em_log_n::key::KeyBuilder;
 use em_log_n::shard::{DomainId, IndexSpec, Metric, Shard, ShardSpec};

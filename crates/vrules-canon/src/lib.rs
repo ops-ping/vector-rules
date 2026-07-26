@@ -62,7 +62,7 @@ pub mod json;
 pub mod audit;
 
 pub use mask::LogMask;
-pub use sim::{hamming_distance, NearDupChecker, SimHash64};
+pub use sim::{NearDupChecker, SimHash64, hamming_distance};
 
 #[cfg(feature = "json")]
 pub use json::{JsonHybrid, SchemaFingerprint};

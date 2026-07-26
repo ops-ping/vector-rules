@@ -7,17 +7,17 @@
 
 use std::sync::Arc;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use em_log_n::embed::{Embedder, ModelId};
 use rust_rule_engine::types::{FunctionMeta, ReturnKind};
 use rust_rule_engine::{Facts, RuleEngineError, RustRuleEngine, Value as RuleValue};
-use vrules_core::canon::{register_canon_functions, CanonKind, CanonRouter};
+use vrules_core::canon::{CanonKind, CanonRouter, register_canon_functions};
 use vrules_core::geometry::{ArtifactStore, Axis, Calibration, Provenance, Region};
 use vrules_core::{
-    add_json_fact, address_index_record, address_policy_fact, register_vector_functions,
-    standardize_structured_address, standardize_structured_with_index,
-    standardize_unstructured_address, AddressIndex, EvalOutcome, RuleEvaluator, Ruleset,
+    AddressIndex, EvalOutcome, RuleEvaluator, Ruleset, add_json_fact, address_index_record,
+    address_policy_fact, register_vector_functions, standardize_structured_address,
+    standardize_structured_with_index, standardize_unstructured_address,
 };
 
 use wasm_bindgen::prelude::*;

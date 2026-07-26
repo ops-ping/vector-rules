@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use em_log_n::key::{KeyBuilder, RowKey};
 use em_log_n::shard::{DomainId, IndexSpec, Metric, Shard, ShardSpec};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use thiserror::Error;
 use vrules_core::address_index_record;
 
@@ -534,14 +534,18 @@ mod tests {
         .unwrap();
         assert_eq!(patch.manifest.upserts, 2);
         assert_eq!(patch.manifest.deletes, 1);
-        assert!(patch
-            .ops
-            .iter()
-            .any(|op| matches!(op, AddressIndexOp::Delete { id, .. } if id.ends_with(":a2"))));
-        assert!(patch
-            .ops
-            .iter()
-            .any(|op| matches!(op, AddressIndexOp::Upsert { row } if row.id.ends_with(":a3"))));
+        assert!(
+            patch
+                .ops
+                .iter()
+                .any(|op| matches!(op, AddressIndexOp::Delete { id, .. } if id.ends_with(":a2")))
+        );
+        assert!(
+            patch
+                .ops
+                .iter()
+                .any(|op| matches!(op, AddressIndexOp::Upsert { row } if row.id.ends_with(":a3")))
+        );
     }
 
     #[test]

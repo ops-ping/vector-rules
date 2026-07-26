@@ -11,11 +11,11 @@
 
 #![cfg(all(feature = "fjall-backend", feature = "usearch-backend"))]
 
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
-use em_log_n::key::{KeyBuilder, KeyParts, DEFAULT_HASH_LEN};
+use em_log_n::key::{DEFAULT_HASH_LEN, KeyBuilder, KeyParts};
 use em_log_n::shard::{DomainId, IndexSpec, Metric, Shard, ShardSpec};
 
 fn norm(mut v: Vec<f32>) -> Vec<f32> {

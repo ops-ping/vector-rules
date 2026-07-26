@@ -10,9 +10,9 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use em_log_n::key::{KeyBuilder, KeyParts, RowKey, DEFAULT_HASH_LEN};
+use em_log_n::key::{DEFAULT_HASH_LEN, KeyBuilder, KeyParts, RowKey};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(start)]

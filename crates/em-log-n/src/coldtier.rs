@@ -374,7 +374,7 @@ impl<'a> Iterator for KvSnapshotReader<'a> {
 #[cfg(all(feature = "fjall-backend", feature = "usearch-backend"))]
 mod publish {
     use super::{
-        encode_kv_record, idx_key, kv_key, manifest_key, KvSnapshotReader, Manifest, ObjectStore,
+        KvSnapshotReader, Manifest, ObjectStore, encode_kv_record, idx_key, kv_key, manifest_key,
     };
     use crate::error::{Error, Result};
     use crate::shard::Shard;
@@ -440,7 +440,7 @@ mod publish {
                         return Err(Error::ObjectStore(format!(
                             "idx snapshot missing for {}",
                             ispec.name
-                        )))
+                        )));
                     }
                 };
                 shard.load_index_bytes(&ispec.name, &buf)?;

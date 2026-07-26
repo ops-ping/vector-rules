@@ -260,13 +260,17 @@ fn put_rejects_unknown_index_and_wrong_dim_before_any_write() {
     let v_wrong = vec![0.0f32; dim + 1];
 
     // Unknown index name.
-    assert!(shard
-        .put(&key, b"v", &[("nope", v_right.as_slice())])
-        .is_err());
+    assert!(
+        shard
+            .put(&key, b"v", &[("nope", v_right.as_slice())])
+            .is_err()
+    );
     // Wrong dim.
-    assert!(shard
-        .put(&key, b"v", &[("text", v_wrong.as_slice())])
-        .is_err());
+    assert!(
+        shard
+            .put(&key, b"v", &[("text", v_wrong.as_slice())])
+            .is_err()
+    );
 
     // After both failures, nothing should be visible.
     assert!(shard.get(&key).unwrap().is_none());

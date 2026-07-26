@@ -1,7 +1,7 @@
 use std::env;
 use std::path::PathBuf;
 
-use vrules_address_indexer::{apply_artifact_native, build_snapshot, write_artifact, PatchRequest};
+use vrules_address_indexer::{PatchRequest, apply_artifact_native, build_snapshot, write_artifact};
 
 fn main() {
     if let Err(err) = run() {

@@ -9,8 +9,8 @@
 //! repeats so this layer only ever serves genuine misses.
 
 use crate::error::{Error, Result};
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// Maps a text input to a fixed-dimension f32 vector.
 pub trait Embedder: Send + Sync {
