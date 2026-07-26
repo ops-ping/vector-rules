@@ -168,16 +168,6 @@ semantic reasoning for cases that need it. Vector search is not bolted onto the
 side of the engine: canonical and vector expressions participate directly in
 rule evaluation.
 
-## Where the same policy applies
-
-| Use case | How vector-rules applies |
-|---|---|
-| **Agent and MCP mediation** | Use connection and request facts to expose allowed tools, choose providers, and audit execution. |
-| **Organizational memory** | Control what can be written or recalled while preserving model identity and searchable provenance. |
-| **Applications and batch jobs** | Apply the same decisions to individual requests or large collections of structured records and documents. |
-| **Streaming workloads** | Evaluate sequential events with windows, watermarks, joins, and state. |
-| **Browser analysis** | Validate policy, run what-if scenarios, compare outcomes, and inspect proofs locally. |
-
 ## Reference examples
 
 The standalone [`apps/examples`](apps/examples) application is a suite of
@@ -196,12 +186,7 @@ Address verification is one reference workflow in this suite, not a framework
 business domain. Its PWA and native hosts consume the same structured facts and
 `shared-rules/address/*.grl` policy. Address-oriented crates and
 `vrules-core::address` support that example without becoming required runtime
-components or core rule semantics. The
-[browser examples gallery](docs/EXAMPLES.md) provides screenshots and a
-walkthrough of every example.
-
-The remaining sections describe how these capabilities are implemented and
-packaged.
+components or core rule semantics.
 
 ## Embeddings inside deterministic rules
 
@@ -298,171 +283,36 @@ without pooling metadata can set `pooling` to `mean`, `cls`, or `last`.
 
 ## Architecture
 
-`vrules-shim` is the only native runtime executable. It hosts independently
-replaceable WebAssembly components with Wasmtime and grants each guest only its
-configured filesystem and HTTP capabilities.
+vector-rules uses a single native executable (`vrules-shim`) that hosts
+independently replaceable WebAssembly components with Wasmtime. Rules are
+Git-governed, evaluated through forward chaining and backward proof, and
+executed by the same rule kernel in both the browser and production. See the
+full [architecture documentation](docs/ARCHITECTURE.md) for the component
+layout, GitOps lifecycle, engine compatibility, and embedding cache design.
 
-```mermaid
-flowchart LR
-    Client["MCP client"] -->|stdio JSON-RPC| Host["vrules-shim<br/>Wasmtime host"]
-    Browser["Admin PWA / WebSocket client"] -->|--daemon only| Host
-    Host --> Runtime["runtime WASI component"]
-    Host --> Rules["rules WASI component"]
-    Host --> Storage["append-only storage WASI component"]
-    Host --> Cache["content-addressed embedding cache<br/>WASI component"]
-    Host --> Admin["admin WASI component"]
-    Host --> GCP["optional GCP WASI component"]
-    Host --> Embedding["wllama WASI component<br/>configured GGUF model"]
-    Rules --> Repo["Git-governed shared-rules"]
-```
+## Repository structure
 
-The default mode is MCP over stdin/stdout:
-
-```sh
-vrules-shim
-```
-
-The optional daemon mode adds the admin PWA, JSON RPC, and MCP WebSocket
-surfaces:
-
-```sh
-vrules-shim --daemon
-vrules-shim --daemon --bind 127.0.0.1:8765
-```
-
-The component manifest is the deployment boundary: it selects implementations,
-configuration, filesystem preopens, and HTTP allowlists without adding private
-component IPC protocols. `wit/vrules.wit` remains backend-neutral.
-
-### GitOps and runtime lifecycle
-
-`shared-rules/` contains reusable rule sets and schemas. The rules component
-reads the active working tree and can also evaluate Git branches, tags, or
-commit IDs. The admin surface supports revision-aware listing, diff, comparison,
-what-if evaluation, A/B runs, and promotion with explicit sign-off and
-fast-forward enforcement.
-
-```mermaid
-sequenceDiagram
-    participant Author as Author / reviewer
-    participant Git as shared-rules
-    participant Console as Console / what-if
-    participant Client as MCP client / app
-    participant Host as vrules-shim
-    participant Runtime as runtime component
-    participant Rules as rules component
-    participant Storage as audit / memory component
-    participant Provider as provider component
-
-    Author->>Git: edit and review rules
-    Console->>Rules: load candidate revision
-    Rules->>Git: evaluate branch, tag, or commit
-    Console->>Rules: validate / replay / compare
-    Author->>Rules: signed-off fast-forward promotion
-    Client->>Host: production request
-    Host->>Runtime: dispatch typed call
-    Runtime->>Rules: assert facts and fire rules
-    Rules-->>Runtime: decision and trace
-    Runtime->>Provider: rule-selected call
-    Runtime->>Storage: append audit / memory events
-    Runtime-->>Host: governed response
-    Host-->>Client: MCP response
-```
-
-Candidate rules can be tested in the browser, reviewed and promoted through git,
-then executed by the same native rule kernel in the rules component. Forward
-traces and backward proof explain decisions without asking a model to reconstruct
-the reasoning afterward. Production traces and audit events retain the active
-rule revision and decision evidence, tying runtime behavior back to the reviewed
-policy source.
-
-### Engine compatibility
-
-vector-rules uses rust-rule-engine as its engine of record. The fork stays
-consistent with the originating project wherever possible so upstream parser,
-runtime, and evaluator improvements can roll forward without a translation
-layer. General engine fixes remain upstream-compatible fork changes; vector,
-canonicalization, address, MCP, and product behavior use the engine's existing
-extension APIs. The core design records the required deviation policy in
-[`crates/vrules-core/docs/DESIGN.md`](crates/vrules-core/docs/DESIGN.md).
-
-## Components
+### WASI components
 
 | Component | Responsibility |
 |---|---|
-| [`vrules-shim`](crates/vrules-shim) | Native Wasmtime host, MCP stdio/WebSocket transport, admin HTTP surface, component capabilities, and model overrides |
-| `vrules-runtime` | MCP protocol, rule-driven tool exposure and routing, audit, response caching, and memory tools |
-| `vrules-rules` | GRL loading, canonical forward evaluation, validation, proof, Git revisions, diff, comparison, and fast-forward promotion |
-| `vrules-storage` | Append-only audit, memory, and response-cache events with model-revision-aware vector search |
+| [`vrules-runtime`](components/vrules-runtime) | MCP protocol, rule-driven tool exposure and routing, audit, response caching, and memory tools |
+| [`vrules-rules`](components/vrules-rules) | GRL loading, canonical forward evaluation, validation, proof, Git revisions, diff, comparison, and fast-forward promotion |
+| [`vrules-storage`](components/vrules-storage) | Append-only audit, memory, and response-cache events with model-revision-aware vector search |
 | [`vrules-cache`](components/vrules-cache) | Append-only, content-addressed embedding vectors, epoch invalidation, and the local store for the `vrules-rest` cache tier |
-| `vrules-admin` | Admin RPC, what-if, A/B evaluation, rules governance, memory inspection, and embedding diagnostics |
-| `vrules-gcp` | Optional Vertex/Gemini provider with guest-owned ADC and credentials |
-| `vrules-embedding-wllama` | Configurable GGUF embedding inference through pinned wllama/llama.cpp; EmbeddingGemma is the default model |
+| [`vrules-admin`](components/vrules-admin) | Admin RPC, what-if, A/B evaluation, rules governance, memory inspection, and embedding diagnostics |
+| [`vrules-gcp`](components/vrules-gcp) | Optional Vertex/Gemini provider with guest-owned ADC and credentials |
+| [`vrules-embedding-wllama`](components/vrules-embedding-wllama) | Configurable GGUF embedding inference through pinned wllama/llama.cpp; EmbeddingGemma is the default model |
 
 `release/vrules-components.json` declares component paths, configuration,
 preopens, HTTP allowlists, and the admin and cache plugins. Components can be
 replaced without changing the native executable or the shared WIT contract.
 
-## Embedding cache and organizational memory
+### Core libraries and native host
 
-`vrules-cache` is a persistent embedding accelerator, not an
-in-process memoization map. In a component deployment, embedding requests from
-rule evaluation, `memory_write`, `memory_update`, `memory_search`, diagnostics,
-and the `vrules-rest` routes all reach the real embedding model through the
-same cache-through host path:
-
-```text
-local cache -> optional parent vrules-rest tier -> embedding inference
-     ^                                              |
-     +------------------- write-back ---------------+
-```
-
-The content key combines the embedding-model revision, canonicalization
-namespace, and text content. Identical text therefore reuses one vector within
-the same model and canonicalization contract. Changing the model revision or
-supplying a new canonicalization namespace selects a different keyspace instead
-of serving stale coordinates. A local miss can pull from a configured parent
-tier; only a miss at every tier runs inference. Newly computed vectors are
-written locally and, when configured, back to the parent so other nodes can
-reuse them.
-
-Cache entries are append-only. Expiration appends an epoch change and makes
-older generations non-live rather than deleting their records, so cache state
-remains reconstructable. Cache failures are treated as misses on the embedding
-path: they may cost an inference, but they do not change the resulting vector
-or fail a rule or memory operation. The
-[`vrules-rest` API](crates/vrules-shim/README.md#vrules-rest) also exposes
-immutable hash lookups, compute-on-miss requests, lossless f32 vector bodies,
-strong ETags, write-up, expiration, and cache statistics.
-
-Organizational memory and the embedding cache have separate responsibilities:
-
-| | Organizational memory | Embedding cache |
-|---|---|---|
-| **Stores** | Governed facts, tags, source, supersession and tombstone events, vectors, and model identity | Derived vectors keyed by model, canonicalization namespace, and text |
-| **Lifecycle** | Writes, corrections, and deletes append events so history remains auditable | Puts and epoch invalidations append records; entries can be regenerated |
-| **Role** | Source of durable, policy-controlled recall | Shared accelerator for producing semantic evidence |
-
-Updates and deletes append supersession and tombstone events rather than
-altering prior memory. Audit and memory history therefore remain
-reconstructable, and vector events carry model identity so recall never crosses
-incompatible model revisions.
-
-A memory write or update embeds the fact once and stores that vector with the
-append-only event. A search embeds its query once and compares it with the
-stored vectors; it does not re-embed the memory collection. Repeated facts,
-queries, rule literals, and cross-agent requests reuse cached vectors, while
-model identity prevents recall across incompatible vector spaces.
-
-This removes duplicate GGUF forward passes from the common path, reducing
-latency, CPU or GPU utilization, energy use, and the infrastructure cost of
-organizational recall. A deployment using a compatible metered embedding
-provider also avoids duplicate billable inference calls. Parent cache tiers
-extend the same savings across processes and machines without turning the cache
-into the memory system of record.
-
-## Core libraries and console
-
+- [`vrules-shim`](crates/vrules-shim) is the native Wasmtime host. It provides
+  MCP stdio/WebSocket transport, admin HTTP surface, component capabilities,
+  and model overrides.
 - [`vrules-core`](crates/vrules-core) provides `Ruleset`, `RuleEvaluator`,
   upstream synchronous streaming types, vector/canonical functions, execution
   statistics, and proof.
@@ -473,9 +323,14 @@ into the memory system of record.
   embedding-cache primitives.
 - [`em-log-n-wasm`](crates/em-log-n-wasm) provides the browser storage and
   vector-index shape over IndexedDB.
+
+### Applications
+
 - [`apps/console`](apps/console) is the Svelte admin PWA embedded in daemon
   mode. Operational panels remain top-level; demonstrations use isolated routes
   under `#/examples/*`.
+- [`apps/examples`](apps/examples) is the standalone example suite that runs in
+  the browser with real EmbeddingGemma vectors.
 
 ## Release package
 
@@ -542,9 +397,9 @@ substitute hash-derived, random, zero, or synthetic embeddings.
 ## Repository layout
 
 ```text
-apps/console/  Svelte/Vite admin and example PWA embedded by the native shim
-components/    non-Rust WASI component sources
-crates/        Rust workspace members and Rust WASI guests
+apps/          Svelte/Vite PWA console and browser example suite
+components/    WASI component sources (Rust and C++)
+crates/        Rust workspace members: core libraries and native host
 shared-rules/  Git-governed GRL, schemas, and manifest
 wit/           backend-neutral component interfaces
 docs/          roadmap, positioning, and architecture documents
@@ -553,6 +408,7 @@ release/       component manifests, build scripts, and packaging
 
 ## Documentation
 
+- [Architecture](docs/ARCHITECTURE.md)
 - [Browser examples gallery](docs/EXAMPLES.md)
 - [Runtime and `vrules-rest` API](crates/vrules-shim/README.md)
 - [Core design](crates/vrules-core/docs/DESIGN.md)
