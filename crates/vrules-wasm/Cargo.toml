@@ -1,9 +1,9 @@
 [package]
 name = "vrules-wasm"
 version.workspace = true
-edition = "2021"
+edition.workspace = true
 description = "Browser WASM policy engine for GRL rules, semantic predicates, reference workflows, and proof."
-license = "MIT OR Apache-2.0"
+license.workspace = true
 publish = false
 
 [lib]

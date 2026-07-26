@@ -35,7 +35,7 @@ reqwest = { workspace = true }
 tempfile = "=3.27.0"
 
 [package.metadata.deb]
-maintainer = "ops-ping <ops@phage-shift.com>"
+maintainer = "ops-ping <241499582+ops-ping@users.noreply.github.com>"
 section = "utils"
 priority = "optional"
 extended-description = "MCP stdio by default and optional admin HTTP/WebSocket daemon mode, hosting pluggable vrules WASI components with Wasmtime."

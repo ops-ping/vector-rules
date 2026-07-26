@@ -1,9 +1,9 @@
 [package]
 name = "em-log-n-wasm"
 version.workspace = true
-edition = "2021"
+edition.workspace = true
 description = "Browser WASM distribution of em-log-n with local IndexedDB-backed persistence wrapper."
-license = "MIT OR Apache-2.0"
+license.workspace = true
 publish = false
 
 [lib]

@@ -283,16 +283,16 @@ fn manifest_key(domain: &str) -> String {
     format!("{domain}/{MANIFEST_KEY}")
 }
 #[cfg(all(feature = "fjall-backend", feature = "usearch-backend"))]
-fn gen_dir(domain: &str, gen: u64) -> String {
-    format!("{domain}/gen/{gen:08}")
+fn gen_dir(domain: &str, generation: u64) -> String {
+    format!("{domain}/gen/{generation:08}")
 }
 #[cfg(all(feature = "fjall-backend", feature = "usearch-backend"))]
-fn kv_key(domain: &str, gen: u64) -> String {
-    format!("{}/kv.snapshot", gen_dir(domain, gen))
+fn kv_key(domain: &str, generation: u64) -> String {
+    format!("{}/kv.snapshot", gen_dir(domain, generation))
 }
 #[cfg(all(feature = "fjall-backend", feature = "usearch-backend"))]
-fn idx_key(domain: &str, gen: u64, name: &str) -> String {
-    format!("{}/idx.{name}.usearch", gen_dir(domain, gen))
+fn idx_key(domain: &str, generation: u64, name: &str) -> String {
+    format!("{}/idx.{name}.usearch", gen_dir(domain, generation))
 }
 
 // ---------------------------------------------------------------------------
@@ -422,9 +422,9 @@ mod publish {
     /// Returns `ObjectStore` for hard failures (missing segment still listed
     /// in the manifest after re-check, or torn bytes).
     pub fn restore_into(shard: &Shard, store: &dyn ObjectStore, domain: &str) -> Result<()> {
-        let load = |gen: u64| -> Result<()> {
+        let load = |generation: u64| -> Result<()> {
             // KV snapshot.
-            let kv = match store.get(&kv_key(domain, gen))? {
+            let kv = match store.get(&kv_key(domain, generation))? {
                 Some(b) => b,
                 None => return Err(Error::ObjectStore("kv snapshot missing".into())),
             };
@@ -434,7 +434,7 @@ mod publish {
             }
             // Per-index.
             for ispec in &shard.spec().indexes {
-                let buf = match store.get(&idx_key(domain, gen, &ispec.name))? {
+                let buf = match store.get(&idx_key(domain, generation, &ispec.name))? {
                     Some(b) => b,
                     None => {
                         return Err(Error::ObjectStore(format!(
@@ -453,18 +453,18 @@ mod publish {
             None => return Ok(()), // nothing published yet
         };
         let manifest = Manifest::parse(&manifest_bytes)?;
-        let Some(gen) = manifest.latest() else {
+        let Some(generation) = manifest.latest() else {
             return Ok(());
         };
 
-        match load(gen) {
+        match load(generation) {
             Ok(()) => Ok(()),
             Err(_e) => {
                 // GC-race re-check: if the gen has left the (newly re-read)
                 // manifest, the failure was a delete race and is tolerated.
                 let manifest_now =
                     Manifest::parse(&store.get(&manifest_key(domain))?.unwrap_or_default())?;
-                if !manifest_now.generations.contains(&gen) {
+                if !manifest_now.generations.contains(&generation) {
                     // Try latest of the new manifest (recurse one level).
                     if let Some(next_gen) = manifest_now.latest() {
                         return load(next_gen);
@@ -472,7 +472,7 @@ mod publish {
                     return Ok(());
                 }
                 Err(Error::ObjectStore(format!(
-                    "hard restore failure on gen {gen} (still listed after re-check)"
+                    "hard restore failure on gen {generation} (still listed after re-check)"
                 )))
             }
         }
@@ -494,10 +494,10 @@ mod publish {
         let cutoff = manifest.generations.len() - keep;
         let to_drop: Vec<u64> = manifest.generations.drain(..cutoff).collect();
         store.put(&manifest_key(domain), &manifest.encode())?;
-        for gen in to_drop {
-            store.delete(&kv_key(domain, gen))?;
+        for generation in to_drop {
+            store.delete(&kv_key(domain, generation))?;
             for ispec in &shard.spec().indexes {
-                store.delete(&idx_key(domain, gen, &ispec.name))?;
+                store.delete(&idx_key(domain, generation, &ispec.name))?;
             }
         }
         Ok(())

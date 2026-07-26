@@ -61,8 +61,8 @@ fn publish_restore_round_trip_preserves_kv_and_ann() {
 
     // Publish to cold tier.
     let store = InMemoryStore::new();
-    let gen = publish_generation(&shard_a, &store, "logs").unwrap();
-    assert_eq!(gen, 0);
+    let generation = publish_generation(&shard_a, &store, "logs").unwrap();
+    assert_eq!(generation, 0);
 
     // Open a fresh shard in a fresh directory, restore from cold tier.
     let (_tmp_b, shard_b) = open_shard(dim);
@@ -99,8 +99,8 @@ fn publish_then_gc_keeps_most_recent_n() {
         shard
             .put(&k, format!("v{i}").as_bytes(), &[("text", v.as_slice())])
             .unwrap();
-        let gen = publish_generation(&shard, &store, "logs").unwrap();
-        assert_eq!(gen, i);
+        let generation = publish_generation(&shard, &store, "logs").unwrap();
+        assert_eq!(generation, i);
     }
 
     // GC keep=2 should leave gens [3, 4] live and delete 0..=2.

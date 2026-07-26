@@ -21,6 +21,18 @@ through WebAssembly. Organizations keep their policy in git and can move it
 across models, clients, and deployment environments without depending on a
 proprietary control plane.
 
+## vector-rules in action
+
+The following execution trace demonstrates how semantic meaning is turned into governed policy:
+
+*   **Semantic evidence:** Real vector embeddings (e.g., EmbeddingGemma) measure similarity and contrast directly within a rule.
+*   **Deterministic chaining:** Instead of an LLM making a black-box decision, rules capture these fuzzy measurements as facts, and subsequent rules apply explicit thresholds to derive a final decision.
+*   **Complete traceability:** The engine trace shows exactly which rules fired, what intermediate facts were derived, and how the policy reached its conclusion.
+
+![Semantic similarity over EmbeddingGemma vectors with a forward-chaining trace, running locally in the browser](docs/examples-semantic.png)
+
+This is just one example of what the engine can do. Check out the [browser examples gallery](docs/EXAMPLES.md) to see Address Verification, Fraud Triage, Streaming, and backward-chaining Proof—all running entirely in the browser using WebAssembly.
+
 ## What is a rules engine?
 
 A rules engine applies **declarative policy** to facts. Conventional application
@@ -187,8 +199,6 @@ business domain. Its PWA and native hosts consume the same structured facts and
 components or core rule semantics. The
 [browser examples gallery](docs/EXAMPLES.md) provides screenshots and a
 walkthrough of every example.
-
-![Semantic similarity over EmbeddingGemma vectors with a forward-chaining trace, running in the browser](docs/examples-semantic.png)
 
 The remaining sections describe how these capabilities are implemented and
 packaged.

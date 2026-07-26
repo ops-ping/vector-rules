@@ -1,11 +1,11 @@
 [package]
 name = "em-log-n"
-version = "0.0.1"
-edition = "2021"
-rust-version = "1.90"
-license = "Apache-2.0"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
 description = "Embedded, latency-first searchable log store: fjall + usearch + reverse-ts keys."
-repository = "https://github.com/ops-ping/em-log-n"
+repository.workspace = true
 keywords = ["log", "vector-search", "embedded", "lsm", "usearch"]
 categories = ["database-implementations"]
 

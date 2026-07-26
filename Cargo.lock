@@ -1020,7 +1020,7 @@ checksum = "91622ff5e7162018101f2fea40d6ebf4a78bbe5a49736a2020649edf9693679e"
 
 [[package]]
 name = "em-log-n"
-version = "0.0.1"
+version = "0.0.1-alpha.1"
 dependencies = [
  "blake3",
  "em-log-n",
@@ -4540,7 +4540,7 @@ dependencies = [
 
 [[package]]
 name = "vrules-address-libpostal"
-version = "0.1.0"
+version = "0.0.1-alpha.1"
 dependencies = [
  "vrules-core",
 ]
@@ -4567,7 +4567,7 @@ dependencies = [
 
 [[package]]
 name = "vrules-canon"
-version = "0.1.0"
+version = "0.0.1-alpha.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -4575,7 +4575,7 @@ dependencies = [
 
 [[package]]
 name = "vrules-core"
-version = "0.1.0"
+version = "0.0.1-alpha.1"
 dependencies = [
  "em-log-n",
  "rust-rule-engine",

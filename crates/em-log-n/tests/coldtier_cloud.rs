@@ -64,8 +64,8 @@ fn publish_restore_round_trip_via_cloudstore() {
         .unwrap();
 
     let store = cloud_store();
-    let gen = publish_generation(&shard_a, &store, "logs").unwrap();
-    assert_eq!(gen, 0);
+    let generation = publish_generation(&shard_a, &store, "logs").unwrap();
+    assert_eq!(generation, 0);
 
     let (_tmp_b, shard_b) = open_shard(dim);
     restore_into(&shard_b, &store, "logs").unwrap();
@@ -97,8 +97,8 @@ fn publish_then_gc_via_cloudstore() {
         shard
             .put(&k, format!("v{i}").as_bytes(), &[("text", v.as_slice())])
             .unwrap();
-        let gen = publish_generation(&shard, &store, "logs").unwrap();
-        assert_eq!(gen, i);
+        let generation = publish_generation(&shard, &store, "logs").unwrap();
+        assert_eq!(generation, i);
     }
 
     gc(&shard, &store, "logs", 2).unwrap();

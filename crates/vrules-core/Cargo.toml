@@ -1,10 +1,10 @@
 [package]
 name = "vrules-core"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
 description = "Deterministic Rust RETE policy engine with pluggable embeddings, canonicalization, forward chaining, and proof."
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/ops-ping/vector-rules"
+license.workspace = true
+repository.workspace = true
 readme = "README.md"
 keywords = ["policy-engine", "rules-engine", "rete", "embeddings", "ai-agents"]
 categories = ["data-structures", "algorithms"]

@@ -1,9 +1,9 @@
 [package]
 name = "vrules-address-indexer"
 version.workspace = true
-edition = "2021"
+edition.workspace = true
 description = "Builds address-index snapshots and patches for the vector-rules reference workflow."
-license = "MIT OR Apache-2.0"
+license.workspace = true
 publish = false
 
 [dependencies]
