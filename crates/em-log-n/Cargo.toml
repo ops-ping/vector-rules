@@ -41,7 +41,7 @@ blake3 = "=1.8.5"
 # Pure-Rust canonicalization (no C++/heavy graph) — always on. Enables the
 # `json` strategies so structured payloads canonicalize without a feature dance.
 vrules-canon = { path = "../vrules-canon", features = ["json"] }
-fjall = { version = "=3.1.5", optional = true }
+fjall = { version = "=3.1.8", optional = true }
 usearch = { version = "=2.25.3", default-features = false, optional = true }
 prost = { version = "=0.13.5", optional = true, default-features = false, features = ["derive", "std"] }
 rkyv = { version = "=0.8.16", optional = true, default-features = false, features = ["std", "bytecheck"] }

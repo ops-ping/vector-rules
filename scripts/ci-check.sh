@@ -20,20 +20,20 @@ cargo clippy --workspace --all-targets -- -D warnings
 
 step "build native workspace crates"
 cargo build --workspace \
-  --exclude vrules-runtime-component \
-  --exclude vrules-storage-component \
-  --exclude vrules-rules-component \
-  --exclude vrules-admin-component \
-  --exclude vrules-gcp-component
+  --exclude vrules-runtime \
+  --exclude vrules-storage \
+  --exclude vrules-rules \
+  --exclude vrules-admin \
+  --exclude vrules-gcp
 
 step "WASI components"
 cargo build --target wasm32-wasip2 \
-  -p vrules-runtime-component \
-  -p vrules-storage-component \
-  -p vrules-rules-component \
-  -p vrules-admin-component \
-  -p vrules-gcp-component \
-  -p vrules-cache-component
+  -p vrules-runtime \
+  -p vrules-storage \
+  -p vrules-rules \
+  -p vrules-admin \
+  -p vrules-gcp \
+  -p vrules-cache
 
 step "wasm packages (vrules-wasm + em-log-n-wasm)"
 if command -v wasm-pack >/dev/null 2>&1; then
@@ -46,6 +46,6 @@ fi
 
 step "tests (component host + cached real-embedding conformance)"
 cargo test -p vrules-canon -p em-log-n -p em-log-n-wasm -p vrules-address-indexer \
-  -p vrules-core -p vrules-wasm -p vrules-shim -p vrules-cache-component
+  -p vrules-core -p vrules-wasm -p vrules-shim -p vrules-cache
 
 printf '\n\033[1;32m✓ local CI checks passed — safe to push\033[0m\n'

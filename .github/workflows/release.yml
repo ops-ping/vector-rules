@@ -32,8 +32,8 @@ jobs:
             sha256sum -c -
           tar -C target -xzf target/wasi-sdk.tar.gz
           mv target/wasi-sdk-33.0-x86_64-linux target/wasi-sdk
-          cargo install wit-bindgen-cli --version 0.59.0 --locked --root target/wasi-tools
-          cargo install wasm-tools --version 1.253.0 --locked --root target/wasi-tools
+          cargo install wit-bindgen-cli --version 0.58.0 --locked --root target/wasi-tools
+          cargo install wasm-tools --version 1.251.0 --locked --root target/wasi-tools
           curl -fL --retry 3 -o target/wasi-tools/share/wasi_snapshot_preview1.reactor.wasm \
             https://github.com/bytecodealliance/wasmtime/releases/download/v46.0.1/wasi_snapshot_preview1.reactor.wasm
           echo "0acb10959bd3c1d2e7903ef82212910bfc156ab5698ef3f2ff669474ba59fb0a  target/wasi-tools/share/wasi_snapshot_preview1.reactor.wasm" |

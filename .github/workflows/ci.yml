@@ -39,21 +39,21 @@ jobs:
       - name: Build (workspace)
         run: >-
           cargo build --workspace
-          --exclude vrules-runtime-component
-          --exclude vrules-storage-component
-          --exclude vrules-rules-component
-          --exclude vrules-admin-component
-          --exclude vrules-gcp-component
+          --exclude vrules-runtime
+          --exclude vrules-storage
+          --exclude vrules-rules
+          --exclude vrules-admin
+          --exclude vrules-gcp
 
       - name: Build WASI components
         run: |
           cargo build --target wasm32-wasip2 \
-            -p vrules-runtime-component \
-            -p vrules-storage-component \
-            -p vrules-rules-component \
-            -p vrules-admin-component \
-            -p vrules-gcp-component \
-            -p vrules-cache-component
+            -p vrules-runtime \
+            -p vrules-storage \
+            -p vrules-rules \
+            -p vrules-admin \
+            -p vrules-gcp \
+            -p vrules-cache
 
       - name: Install wasm-pack
         run: cargo install wasm-pack --locked
@@ -75,7 +75,7 @@ jobs:
           -p vrules-core
           -p vrules-wasm
           -p vrules-shim
-          -p vrules-cache-component
+          -p vrules-cache
 
   deny:
     name: cargo-deny (advisory)

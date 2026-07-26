@@ -1,5 +1,5 @@
 [package]
-name = "vrules-rules-component"
+name = "vrules-rules"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,7 +12,7 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-em-log-n = { path = "../em-log-n", default-features = false }
+em-log-n = { path = "../../crates/em-log-n", default-features = false }
 gix = { workspace = true }
 rust-rule-engine = { workspace = true }
 serde = { workspace = true }

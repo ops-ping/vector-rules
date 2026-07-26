@@ -4,7 +4,11 @@
 [advisories]
 version = 2
 yanked = "warn"
-ignore = []
+ignore = [
+    # rsa: Marvin Attack side-channel. No safe upgrade available.
+    # Used by vrules-gcp for JWT signing.
+    "RUSTSEC-2023-0071"
+]
 
 [licenses]
 version = 2

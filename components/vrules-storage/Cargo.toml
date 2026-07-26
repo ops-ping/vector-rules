@@ -1,23 +1,19 @@
 [package]
-name = "vrules-cache-component"
+name = "vrules-storage"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Append-only content-addressed embedding cache store for the vrules-rest tier."
+description = "Append-only WASI storage for audited organizational memory, embedding caches, and rule events."
 publish = false
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
 
 [dependencies]
+blake3 = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { workspace = true }
-
-[target.'cfg(target_arch = "wasm32")'.dependencies]
 wit-bindgen = { workspace = true }
-
-[dev-dependencies]
-tempfile = "=3.27.0"

@@ -381,12 +381,12 @@ extension APIs. The core design records the required deviation policy in
 | Component | Responsibility |
 |---|---|
 | [`vrules-shim`](crates/vrules-shim) | Native Wasmtime host, MCP stdio/WebSocket transport, admin HTTP surface, component capabilities, and model overrides |
-| `vrules-runtime-component` | MCP protocol, rule-driven tool exposure and routing, audit, response caching, and memory tools |
-| `vrules-rules-component` | GRL loading, canonical forward evaluation, validation, proof, Git revisions, diff, comparison, and fast-forward promotion |
-| `vrules-storage-component` | Append-only audit, memory, and response-cache events with model-revision-aware vector search |
-| [`vrules-cache-component`](crates/vrules-cache-component) | Append-only, content-addressed embedding vectors, epoch invalidation, and the local store for the `vrules-rest` cache tier |
-| `vrules-admin-component` | Admin RPC, what-if, A/B evaluation, rules governance, memory inspection, and embedding diagnostics |
-| `vrules-gcp-component` | Optional Vertex/Gemini provider with guest-owned ADC and credentials |
+| `vrules-runtime` | MCP protocol, rule-driven tool exposure and routing, audit, response caching, and memory tools |
+| `vrules-rules` | GRL loading, canonical forward evaluation, validation, proof, Git revisions, diff, comparison, and fast-forward promotion |
+| `vrules-storage` | Append-only audit, memory, and response-cache events with model-revision-aware vector search |
+| [`vrules-cache`](components/vrules-cache) | Append-only, content-addressed embedding vectors, epoch invalidation, and the local store for the `vrules-rest` cache tier |
+| `vrules-admin` | Admin RPC, what-if, A/B evaluation, rules governance, memory inspection, and embedding diagnostics |
+| `vrules-gcp` | Optional Vertex/Gemini provider with guest-owned ADC and credentials |
 | `vrules-embedding-wllama` | Configurable GGUF embedding inference through pinned wllama/llama.cpp; EmbeddingGemma is the default model |
 
 `release/vrules-components.json` declares component paths, configuration,
@@ -395,7 +395,7 @@ replaced without changing the native executable or the shared WIT contract.
 
 ## Embedding cache and organizational memory
 
-`vrules-cache-component` is a persistent embedding accelerator, not an
+`vrules-cache` is a persistent embedding accelerator, not an
 in-process memoization map. In a component deployment, embedding requests from
 rule evaluation, `memory_write`, `memory_update`, `memory_search`, diagnostics,
 and the `vrules-rest` routes all reach the real embedding model through the
@@ -491,24 +491,24 @@ workspace and Rust WASI guests build with:
 
 ```sh
 cargo build --workspace \
-  --exclude vrules-runtime-component \
-  --exclude vrules-storage-component \
-  --exclude vrules-rules-component \
-  --exclude vrules-admin-component \
-  --exclude vrules-gcp-component \
-  --exclude vrules-cache-component
+  --exclude vrules-runtime \
+  --exclude vrules-storage \
+  --exclude vrules-rules \
+  --exclude vrules-admin \
+  --exclude vrules-gcp \
+  --exclude vrules-cache
 
 cargo build --target wasm32-wasip2 \
-  -p vrules-runtime-component \
-  -p vrules-storage-component \
-  -p vrules-rules-component \
-  -p vrules-admin-component \
-  -p vrules-gcp-component \
-  -p vrules-cache-component
+  -p vrules-runtime \
+  -p vrules-storage \
+  -p vrules-rules \
+  -p vrules-admin \
+  -p vrules-gcp \
+  -p vrules-cache
 ```
 
 The wllama component additionally requires wasi-sdk 33, `wit-bindgen-cli`
-0.59.0, `wasm-tools` 1.253.0, and Wasmtime's Preview 1 reactor adapter:
+0.58.0, `wasm-tools` 1.251.0, and Wasmtime's Preview 1 reactor adapter:
 
 ```sh
 ./release/build-components.sh

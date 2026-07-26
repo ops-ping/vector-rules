@@ -7,12 +7,12 @@ out="${1:-$root/target/vrules-components}"
 mkdir -p "$out"
 
 cargo build --release --target wasm32-wasip2 \
-  -p vrules-runtime-component \
-  -p vrules-storage-component \
-  -p vrules-rules-component \
-  -p vrules-admin-component \
-  -p vrules-gcp-component \
-  -p vrules-cache-component
+  -p vrules-runtime \
+  -p vrules-storage \
+  -p vrules-rules \
+  -p vrules-admin \
+  -p vrules-gcp \
+  -p vrules-cache
 
 target_dir="$(
   cargo metadata --format-version 1 --no-deps |
@@ -21,11 +21,11 @@ target_dir="$(
 [[ -n "$target_dir" ]] || { echo "cannot resolve Cargo target directory" >&2; exit 1; }
 release="$target_dir/wasm32-wasip2/release"
 
-install -m 0644 "$release/vrules_runtime_component.wasm" "$out/vrules-runtime.wasm"
-install -m 0644 "$release/vrules_storage_component.wasm" "$out/vrules-storage.wasm"
-install -m 0644 "$release/vrules_rules_component.wasm" "$out/vrules-rules.wasm"
-install -m 0644 "$release/vrules_admin_component.wasm" "$out/vrules-admin.wasm"
-install -m 0644 "$release/vrules_gcp_component.wasm" "$out/vrules-gcp.wasm"
-install -m 0644 "$release/vrules_cache_component.wasm" "$out/vrules-cache.wasm"
+install -m 0644 "$release/vrules_runtime.wasm" "$out/vrules-runtime.wasm"
+install -m 0644 "$release/vrules_storage.wasm" "$out/vrules-storage.wasm"
+install -m 0644 "$release/vrules_rules.wasm" "$out/vrules-rules.wasm"
+install -m 0644 "$release/vrules_admin.wasm" "$out/vrules-admin.wasm"
+install -m 0644 "$release/vrules_gcp.wasm" "$out/vrules-gcp.wasm"
+install -m 0644 "$release/vrules_cache.wasm" "$out/vrules-cache.wasm"
 
 "$root/components/vrules-embedding-wllama/build.sh" "$out"

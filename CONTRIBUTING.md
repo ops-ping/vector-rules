@@ -45,18 +45,18 @@ The native workspace and Rust WASI components use Rust 1.94:
 ```sh
 cargo build --workspace
 cargo build --target wasm32-wasip2 \
-  -p vrules-runtime-component \
-  -p vrules-storage-component \
-  -p vrules-rules-component \
-  -p vrules-admin-component \
-  -p vrules-gcp-component
+  -p vrules-runtime \
+  -p vrules-storage \
+  -p vrules-rules \
+  -p vrules-admin \
+  -p vrules-gcp
 ```
 
 The real embedding component requires:
 
 - wasi-sdk 33 at `target/wasi-sdk` or `WASI_SDK_PATH`
-- `wit-bindgen` 0.59.0 at `target/wasi-tools/bin/wit-bindgen` or `WIT_BINDGEN`
-- `wasm-tools` 1.253.0 at `target/wasi-tools/bin/wasm-tools` or `WASM_TOOLS`
+- `wit-bindgen` 0.58.0 at `target/wasi-tools/bin/wit-bindgen` or `WIT_BINDGEN`
+- `wasm-tools` 1.251.0 at `target/wasi-tools/bin/wasm-tools` or `WASM_TOOLS`
 - the Wasmtime Preview 1 reactor adapter at
   `target/wasi-tools/share/wasi_snapshot_preview1.reactor.wasm` or
   `WASI_REACTOR_ADAPTER`
