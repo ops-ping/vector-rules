@@ -184,8 +184,8 @@ Check out the [browser examples gallery](docs/EXAMPLES.md) to see these interact
 
 | Component | Responsibility |
 |---|---|
-| [`vrules-runtime`](components/vrules-runtime) | MCP protocol, rule-driven tool exposure and routing, audit, response caching, and memory tools |
-| [`vrules-rules`](components/vrules-rules) | GRL loading, canonical forward evaluation, validation, proof, Git revisions, diff, comparison, and fast-forward promotion |
+| [`vrules-mcp`](components/vrules-mcp) | MCP protocol implementation, tool exposure, rule-driven tool routing, audit events, and memory tools |
+| [`vrules-harness`](components/vrules-harness) | WASI harness for `vrules-core`: Git-governed rule loading, GRL parsing, forward traces, and backward proofs |
 | [`vrules-storage`](components/vrules-storage) | Append-only audit, memory, and response-cache events with model-revision-aware vector search |
 | [`vrules-cache`](components/vrules-cache) | Append-only, content-addressed embedding vectors, epoch invalidation, and the local store for the `vrules-rest` cache tier |
 | [`vrules-admin`](components/vrules-admin) | Admin RPC, what-if, A/B evaluation, rules governance, memory inspection, and embedding diagnostics |
@@ -239,17 +239,17 @@ Rust 1.94 and WASI targets are pinned in `rust-toolchain.toml`. Build native wor
 
 ```sh
 cargo build --workspace \
-  --exclude vrules-runtime \
+  --exclude vrules-mcp \
   --exclude vrules-storage \
-  --exclude vrules-rules \
+  --exclude vrules-harness \
   --exclude vrules-admin \
   --exclude vrules-gcp \
   --exclude vrules-cache
 
 cargo build --target wasm32-wasip2 \
-  -p vrules-runtime \
+  -p vrules-mcp \
   -p vrules-storage \
-  -p vrules-rules \
+  -p vrules-harness \
   -p vrules-admin \
   -p vrules-gcp \
   -p vrules-cache

@@ -20,17 +20,17 @@ cargo clippy --workspace --all-targets -- -D warnings
 
 step "build native workspace crates"
 cargo build --workspace \
-  --exclude vrules-runtime \
+  --exclude vrules-mcp \
   --exclude vrules-storage \
-  --exclude vrules-rules \
+  --exclude vrules-harness \
   --exclude vrules-admin \
   --exclude vrules-gcp
 
 step "WASI components"
 cargo build --target wasm32-wasip2 \
-  -p vrules-runtime \
+  -p vrules-mcp \
   -p vrules-storage \
-  -p vrules-rules \
+  -p vrules-harness \
   -p vrules-admin \
   -p vrules-gcp \
   -p vrules-cache

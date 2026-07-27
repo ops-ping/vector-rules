@@ -1,11 +1,11 @@
 [package]
-name = "vrules-runtime"
+name = "vrules-mcp"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "WASI runtime for governed MCP tool exposure, routing, audit, agent memory, and provider composition."
+description = "WASI component implementing MCP tool exposure, rule-driven routing, audit, memory tools, and provider dispatch."
 publish = false
 
 [lib]

@@ -1,6 +1,6 @@
 {
   "runtime": {
-    "path": "components/vrules-runtime.wasm",
+    "path": "components/vrules-mcp.wasm",
     "config": {
       "rules_plugin": "rules",
       "storage_plugin": "storage",
@@ -28,7 +28,7 @@
   "plugins": [
     {
       "id": "rules",
-      "path": "components/vrules-rules.wasm",
+      "path": "components/vrules-harness.wasm",
       "config": {
         "rules_dir": "/rules/shared-rules",
         "directories": ["proxy"],

@@ -1,11 +1,11 @@
 [package]
-name = "vrules-rules"
+name = "vrules-harness"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "WASI policy component for Git-governed rules, MCP exposure, RETE evaluation, traces, and proof."
+description = "WASI harness component for vrules-core: loading GRL rules from Git repositories and evaluating RETE forward traces and backward proofs."
 publish = false
 
 [lib]

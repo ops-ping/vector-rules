@@ -4600,7 +4600,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "vrules-rules"
+name = "vrules-harness"
 version = "0.0.1-alpha.1"
 dependencies = [
  "em-log-n",
@@ -4613,7 +4613,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "vrules-runtime"
+name = "vrules-mcp"
 version = "0.0.1-alpha.1"
 dependencies = [
  "blake3",

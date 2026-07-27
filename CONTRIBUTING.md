@@ -45,9 +45,9 @@ The native workspace and Rust WASI components use Rust 1.94:
 ```sh
 cargo build --workspace
 cargo build --target wasm32-wasip2 \
-  -p vrules-runtime \
+  -p vrules-mcp \
   -p vrules-storage \
-  -p vrules-rules \
+  -p vrules-harness \
   -p vrules-admin \
   -p vrules-gcp
 ```

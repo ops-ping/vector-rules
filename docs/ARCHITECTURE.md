@@ -8,14 +8,14 @@ configured filesystem and HTTP capabilities.
 flowchart LR
     Client["MCP client"] -->|stdio JSON-RPC| Host["vrules-shim<br/>Wasmtime host"]
     Browser["Admin PWA / WebSocket client"] -->|--daemon only| Host
-    Host --> Runtime["runtime WASI component"]
-    Host --> Rules["rules WASI component"]
+    Host --> MCP["vrules-mcp WASI component"]
+    Host --> Harness["vrules-harness WASI component"]
     Host --> Storage["append-only storage WASI component"]
     Host --> Cache["content-addressed embedding cache<br/>WASI component"]
     Host --> Admin["admin WASI component"]
     Host --> GCP["optional GCP WASI component"]
     Host --> Embedding["wllama WASI component<br/>configured GGUF model"]
-    Rules --> Repo["Git-governed shared-rules"]
+    Harness --> Repo["Git-governed shared-rules"]
 ```
 
 The default mode is MCP over stdin/stdout:
@@ -51,28 +51,28 @@ sequenceDiagram
     participant Console as Console / what-if
     participant Client as MCP client / app
     participant Host as vrules-shim
-    participant Runtime as runtime component
-    participant Rules as rules component
+    participant MCP as vrules-mcp component
+    participant Harness as vrules-harness component
     participant Storage as audit / memory component
     participant Provider as provider component
 
     Author->>Git: edit and review rules
-    Console->>Rules: load candidate revision
-    Rules->>Git: evaluate branch, tag, or commit
-    Console->>Rules: validate / replay / compare
-    Author->>Rules: signed-off fast-forward promotion
+    Console->>Harness: load candidate revision
+    Harness->>Git: evaluate branch, tag, or commit
+    Console->>Harness: validate / replay / compare
+    Author->>Harness: signed-off fast-forward promotion
     Client->>Host: production request
-    Host->>Runtime: dispatch typed call
-    Runtime->>Rules: assert facts and fire rules
-    Rules-->>Runtime: decision and trace
-    Runtime->>Provider: rule-selected call
-    Runtime->>Storage: append audit / memory events
-    Runtime-->>Host: governed response
+    Host->>MCP: dispatch typed call
+    MCP->>Harness: assert facts and fire rules
+    Harness-->>MCP: decision and trace
+    MCP->>Provider: rule-selected call
+    MCP->>Storage: append audit / memory events
+    MCP-->>Host: governed response
     Host-->>Client: MCP response
 ```
 
 Candidate rules can be tested in the browser, reviewed and promoted through git,
-then executed by the same native rule kernel in the rules component. Forward
+then executed by the same native rule kernel in the harness component (`vrules-harness`). Forward
 traces and backward proof explain decisions without asking a model to reconstruct
 the reasoning afterward. Production traces and audit events retain the active
 rule revision and decision evidence, tying runtime behavior back to the reviewed

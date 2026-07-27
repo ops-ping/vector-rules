@@ -5,8 +5,8 @@ members = [
     "components/vrules-admin",
     "components/vrules-cache",
     "components/vrules-gcp",
-    "components/vrules-rules",
-    "components/vrules-runtime",
+    "components/vrules-harness",
+    "components/vrules-mcp",
     "components/vrules-storage",
 ]
 # apps/console (Svelte/Vite PWA) and shared-rules/ (GitOps rule data) are not crates.

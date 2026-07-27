@@ -25,7 +25,7 @@ execution paths.
 | Redis state | Optional upstream `streaming-redis` feature |
 | Async channel driver | Optional upstream `streaming` feature |
 | Browser forward evaluation | `vrules-wasm` over `Ruleset` and `RuleEvaluator`, including in-browser artifact fitting (`fit_axis`, `fit_region`) |
-| Git-governed rule loading | `vrules-rules` reading `.grl` files |
+| Git-governed rule loading | `vrules-harness` reading `.grl` files |
 | Fork compatibility | Upstream public models and extension APIs; narrow engine-only fixes |
 
 Function-name prefixes are the human-readable projection of the registered

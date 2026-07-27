@@ -86,7 +86,7 @@ fn boot(components: &Path, rest_url: Option<String>) -> TestDaemon {
     let wasm = |name: &str| components.join(name);
     let manifest_json = json!({
         "runtime": {
-            "path": wasm("vrules-runtime.wasm"),
+            "path": wasm("vrules-mcp.wasm"),
             "config": { "rules_plugin": "rules", "storage_plugin": "storage", "cache_ttl_secs": 300 }
         },
         "embedding": {
@@ -99,7 +99,7 @@ fn boot(components: &Path, rest_url: Option<String>) -> TestDaemon {
         "plugins": [
             {
                 "id": "rules",
-                "path": wasm("vrules-rules.wasm"),
+                "path": wasm("vrules-harness.wasm"),
                 "config": {
                     "rules_dir": "/rules/shared-rules",
                     "directories": ["proxy"],

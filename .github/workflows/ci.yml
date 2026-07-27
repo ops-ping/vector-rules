@@ -39,18 +39,18 @@ jobs:
       - name: Build (workspace)
         run: >-
           cargo build --workspace
-          --exclude vrules-runtime
+          --exclude vrules-mcp
           --exclude vrules-storage
-          --exclude vrules-rules
+          --exclude vrules-harness
           --exclude vrules-admin
           --exclude vrules-gcp
 
       - name: Build WASI components
         run: |
           cargo build --target wasm32-wasip2 \
-            -p vrules-runtime \
+            -p vrules-mcp \
             -p vrules-storage \
-            -p vrules-rules \
+            -p vrules-harness \
             -p vrules-admin \
             -p vrules-gcp \
             -p vrules-cache
