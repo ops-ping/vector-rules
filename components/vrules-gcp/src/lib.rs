@@ -155,7 +155,7 @@ impl Guest for GcpComponent {
                             .to_string(),
                     )
                 }
-                other => return Err(format!("unsupported auth operation `{other}`")),
+                other => Err(format!("unsupported auth operation `{other}`")),
             }
         } else {
             let args: Value =

@@ -189,10 +189,10 @@ impl ComponentManifest {
                 bail!("cache_plugin must not be the admin plugin");
             }
         }
-        if let Some(auth_plugin) = &self.auth_plugin {
-            if !ids.contains(auth_plugin.as_str()) {
-                bail!("auth_plugin `{auth_plugin}` does not name a configured plugin");
-            }
+        if let Some(auth_plugin) = &self.auth_plugin
+            && !ids.contains(auth_plugin.as_str())
+        {
+            bail!("auth_plugin `{auth_plugin}` does not name a configured plugin");
         }
         validate_spec("runtime", &self.runtime)?;
         validate_spec("embedding", &self.embedding)?;
