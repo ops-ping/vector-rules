@@ -58,9 +58,11 @@ Admin, governance, and memory routes dispatch to the admin plugin component:
 under `/vrules-rest/v1`, GET with query parameters or POST/PUT/DELETE with JSON
 bodies. Results are returned unwrapped; errors are `{"error"}` with 4xx/5xx.
 
-With `VRULES_REST_UPSTREAM=host:port` the shim joins a cache tier: local misses
-pull through the parent's `/vrules-rest/v1` and locally computed vectors are
+With `VRULES_REST_URL=https://...` the shim joins a cloud tier: local misses
+pull through the remote endpoint and locally computed vectors are
 written back up, with short timeouts and silent fall-back to local inference.
+Authentication is delegated to the configured `auth_plugin` in the component
+manifest, which generates the appropriate `Authorization` header for each request.
 
 ## Manifest
 
@@ -106,7 +108,7 @@ The GCP guest owns ADC parsing, token exchange, and provider configuration.
 | Variable | Meaning |
 |---|---|
 | `VRULES_COMPONENT_MANIFEST` | Component manifest path |
-| `VRULES_REST_UPSTREAM` | Optional `host:port` parent cache tier |
+| `VRULES_REST_URL` | Optional full URL for cloud tier (e.g. `https://storage.googleapis.com/bucket/v1`) |
 | `VRULES_SESSION_ID` / `CLAUDE_CODE_SESSION_ID` | Parent session identity |
 | `VRULES_CHILD_SESSION` / `CLAUDE_CODE_CHILD_SESSION` | Optional child identity |
 | `VRULES_CONTEXT` / `VRULES_PROFILE` | Optional rule context |

@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
-  "description": "Admin and example PWA for governed AI policy: MCP rules, audit, organizational memory, multimodal reference workflows, and browser WASM reasoning.",
+  "description": "Admin PWA for vector-rules. Reason across embeddings with mathematical precision in the browser via WASM and GitOps-governed AI policy.",
   "license": "MIT OR Apache-2.0",
   "repository": { "type": "git", "url": "https://github.com/ops-ping/vector-rules.git" },
   "scripts": {

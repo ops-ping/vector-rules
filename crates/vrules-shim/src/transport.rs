@@ -1,8 +1,8 @@
 use std::io::{BufRead, Write};
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result};
 use axum::body::Bytes;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Path, Query, State};
@@ -68,7 +68,7 @@ pub async fn run_daemon(host: RuntimeHost, config: DaemonConfig) -> Result<()> {
 /// `127.0.0.1:0` and read the local address before calling this).
 pub async fn serve(listener: tokio::net::TcpListener, host: RuntimeHost) -> Result<()> {
     let state = AppState {
-        host: Arc::new(Mutex::new(host)),
+        host: Arc::new(host),
     };
     let app = Router::new()
         .route("/health", get(health))
@@ -115,7 +115,7 @@ pub async fn serve(listener: tokio::net::TcpListener, host: RuntimeHost) -> Resu
 
 #[derive(Clone)]
 struct AppState {
-    host: Arc<Mutex<RuntimeHost>>,
+    host: Arc<RuntimeHost>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -130,22 +130,17 @@ async fn health() -> &'static str {
     "ok"
 }
 
-/// Run a blocking closure against the locked runtime host. The outer error is
-/// infrastructure failure (poisoned lock, join error) and maps to HTTP 500.
+/// Run a blocking closure against the runtime host. The outer error is
+/// infrastructure failure (join error) and maps to HTTP 500.
 async fn with_host<T, F>(state: AppState, work: F) -> Result<T, String>
 where
     F: FnOnce(&RuntimeHost) -> T + Send + 'static,
     T: Send + 'static,
 {
-    tokio::task::spawn_blocking(move || {
-        let host = state
-            .host
-            .lock()
-            .map_err(|_| "runtime host lock poisoned".to_string())?;
-        Ok(work(&host))
-    })
-    .await
-    .map_err(|error| format!("host task failed: {error}"))?
+    let host = state.host.clone();
+    tokio::task::spawn_blocking(move || Ok(work(&host)))
+        .await
+        .map_err(|error| format!("host task failed: {error}"))?
 }
 
 fn error_response(status: StatusCode, message: &str) -> Response {
@@ -556,16 +551,12 @@ async fn mcp_socket(mut socket: WebSocket, state: AppState, identity: Identity) 
     while let Some(Ok(message)) = socket.next().await {
         match message {
             Message::Text(text) => {
-                let state = state.clone();
+                let host = state.host.clone();
                 let identity = identity.clone();
                 let request = text.to_string();
                 let request_for_call = request.clone();
                 let response = tokio::task::spawn_blocking(move || {
-                    state
-                        .host
-                        .lock()
-                        .map_err(|_| anyhow!("runtime host lock poisoned"))?
-                        .mcp(&request_for_call, &identity)
+                    host.mcp(&request_for_call, &identity)
                 })
                 .await;
                 match response {

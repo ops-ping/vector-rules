@@ -68,7 +68,7 @@ fn git(dir: &Path, args: &[&str]) {
 
 /// Boot a full component daemon on an ephemeral port. `None` when the
 /// environment lacks the built components or the real model.
-fn boot(components: &Path, upstream: Option<String>) -> TestDaemon {
+fn boot(components: &Path, rest_url: Option<String>) -> TestDaemon {
     let model = model_path();
     let root = tempfile::tempdir().expect("create daemon root");
     for dir in ["data", "cache"] {
@@ -95,6 +95,7 @@ fn boot(components: &Path, upstream: Option<String>) -> TestDaemon {
         },
         "admin_plugin": "admin",
         "cache_plugin": "cache",
+        "auth_plugin": "gcp-auth",
         "plugins": [
             {
                 "id": "rules",
@@ -124,6 +125,14 @@ fn boot(components: &Path, upstream: Option<String>) -> TestDaemon {
                 "path": wasm("vrules-cache.wasm"),
                 "config": { "cache_dir": "/cache" },
                 "preopens": [{ "host": root.path().join("cache"), "guest": "/cache", "read_only": false }]
+            },
+            {
+                "id": "gcp-auth",
+                "path": wasm("vrules-gcp.wasm"),
+                "config": {
+                    "mode": "auth",
+                    "access_token": "mock-test-token"
+                }
             }
         ]
     });
@@ -140,7 +149,7 @@ fn boot(components: &Path, upstream: Option<String>) -> TestDaemon {
         .use_embedding_model(&model, None)
         .expect("mount embedding model");
     let host =
-        RuntimeHost::load(manifest, ComponentOutput::Daemon, upstream).expect("load runtime host");
+        RuntimeHost::load(manifest, ComponentOutput::Daemon, rest_url).expect("load runtime host");
 
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -195,39 +204,57 @@ fn parse_etag(etag: &str) -> (String, String, u32) {
 
 type UpstreamStore = Arc<Mutex<HashMap<String, Vec<u8>>>>;
 
+const EXPECTED_AUTH_HEADER: &str = "Bearer mock-test-token";
+
 /// A minimal parent tier: GET serves stored vectors, PUT records write-ups.
+/// Both endpoints require a valid Authorization header.
 fn mock_upstream(runtime: &tokio::runtime::Runtime, store: UpstreamStore) -> SocketAddr {
     use axum::body::Bytes;
     use axum::extract::{Path as AxumPath, State};
-    use axum::http::StatusCode;
+    use axum::http::{HeaderMap, StatusCode};
     use axum::routing::get;
+
+    fn require_auth(headers: &HeaderMap) -> Result<(), StatusCode> {
+        let auth = headers
+            .get("authorization")
+            .and_then(|v| v.to_str().ok())
+            .ok_or(StatusCode::UNAUTHORIZED)?;
+        if auth != EXPECTED_AUTH_HEADER {
+            return Err(StatusCode::FORBIDDEN);
+        }
+        Ok(())
+    }
 
     async fn lookup(
         State(store): State<UpstreamStore>,
         AxumPath((model, canon, hash)): AxumPath<(String, String, String)>,
-    ) -> (StatusCode, Vec<u8>) {
+        headers: HeaderMap,
+    ) -> Result<(StatusCode, Vec<u8>), StatusCode> {
+        require_auth(&headers)?;
         let store = store.lock().expect("upstream store lock");
         match store.get(&format!("{model}/{canon}/{hash}")) {
-            Some(bytes) => (StatusCode::OK, bytes.clone()),
-            None => (StatusCode::NOT_FOUND, Vec::new()),
+            Some(bytes) => Ok((StatusCode::OK, bytes.clone())),
+            None => Ok((StatusCode::NOT_FOUND, Vec::new())),
         }
     }
 
     async fn write_up(
         State(store): State<UpstreamStore>,
         AxumPath((model, canon, hash)): AxumPath<(String, String, String)>,
+        headers: HeaderMap,
         body: Bytes,
-    ) -> StatusCode {
+    ) -> Result<StatusCode, StatusCode> {
+        require_auth(&headers)?;
         store
             .lock()
             .expect("upstream store lock")
             .insert(format!("upload:{model}/{canon}/{hash}"), body.to_vec());
-        StatusCode::CREATED
+        Ok(StatusCode::CREATED)
     }
 
     let app = axum::Router::new()
         .route(
-            "/vrules-rest/v1/embeddings/{model}/{canon}/{hash}",
+            "/embeddings/{model}/{canon}/{hash}",
             get(lookup).put(write_up),
         )
         .with_state(store);
@@ -462,8 +489,9 @@ fn upstream_tier(components: &Path) {
         .build()
         .expect("build mock runtime");
     let upstream_address = mock_upstream(&bootstrap, Arc::clone(&store));
+    let rest_url = format!("http://{upstream_address}");
 
-    let daemon = boot(components, Some(upstream_address.to_string()));
+    let daemon = boot(components, Some(rest_url));
     let client = client();
     let base = &daemon.base;
     let canon = vrules_shim::cache_key::encode_path_segment(CANON);

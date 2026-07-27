@@ -46,15 +46,16 @@ struct Services {
     output: ComponentOutput,
     http: reqwest::blocking::Client,
     cache_plugin: Option<String>,
-    upstream: Option<Upstream>,
+    auth_plugin: Option<String>,
+    cloud_tier: Option<CloudTier>,
 }
 
-/// Parent vrules-rest tier: pulled through on a local miss, written up after a
-/// local compute. Requests run while the daemon's global host mutex is held, so
-/// the client carries explicit timeouts — an unbounded stall would freeze every
-/// transport.
-struct Upstream {
-    authority: String,
+/// Global cloud tier for embedding cache: pulls through on a local miss, writes
+/// up after a local compute. The tier accepts a fully qualified base URL
+/// (e.g. `https://storage.googleapis.com/bucket/v1`) and delegates
+/// authentication to the configured auth plugin.
+struct CloudTier {
+    base_url: String,
     client: reqwest::blocking::Client,
 }
 
@@ -124,21 +125,21 @@ impl RuntimeHost {
     pub fn load(
         manifest: ComponentManifest,
         output: ComponentOutput,
-        upstream: Option<String>,
+        rest_url: Option<String>,
     ) -> Result<Self> {
         let mut config = Config::new();
         config.wasm_component_model(true);
         config.wasm_exceptions(true);
         let engine = Engine::new(&config)?;
-        let upstream = upstream
-            .map(|authority| {
-                Ok::<_, anyhow::Error>(Upstream {
-                    authority,
+        let cloud_tier = rest_url
+            .map(|url| {
+                Ok::<_, anyhow::Error>(CloudTier {
+                    base_url: url,
                     client: reqwest::blocking::Client::builder()
                         .connect_timeout(Duration::from_millis(500))
                         .timeout(Duration::from_secs(2))
                         .build()
-                        .context("build upstream cache-tier HTTP client")?,
+                        .context("build cloud tier HTTP client")?,
                 })
             })
             .transpose()?;
@@ -151,7 +152,8 @@ impl RuntimeHost {
                 .build()
                 .context("build component HTTP client")?,
             cache_plugin: manifest.cache_plugin.clone(),
-            upstream,
+            auth_plugin: manifest.auth_plugin.clone(),
+            cloud_tier,
         });
 
         let (embedding, embedding_info) =
@@ -207,6 +209,9 @@ impl RuntimeHost {
                     }
                     plugin_bindings::ai::vrules::types::PluginKind::Provider => {
                         runtime_bindings::ai::vrules::types::PluginKind::Provider
+                    }
+                    plugin_bindings::ai::vrules::types::PluginKind::Auth => {
+                        runtime_bindings::ai::vrules::types::PluginKind::Auth
                     }
                 },
                 operations: descriptor.operations,
@@ -502,7 +507,7 @@ impl Services {
         if let Some(hit) = self.cache_get(&key, dims) {
             return Ok(hit);
         }
-        if let Some(vector) = self.upstream_fetch(model_version, canon_ns, &key, dims) {
+        if let Some(vector) = self.cloud_tier_fetch(model_version, canon_ns, &key, dims) {
             let generation = self.cache_put(&key, &vector).unwrap_or_default();
             return Ok((vector, generation));
         }
@@ -514,7 +519,7 @@ impl Services {
             .map_err(|_| "embedding component lock poisoned".to_string())?
             .embed(text)?;
         let generation = self.cache_put(&key, &vector).unwrap_or_default();
-        self.upstream_store(model_version, canon_ns, &key, &vector);
+        self.cloud_tier_store(model_version, canon_ns, &key, &vector);
         Ok((vector, generation))
     }
 
@@ -581,37 +586,61 @@ impl Services {
             .map_err(CacheError::Failed)
     }
 
-    fn upstream_url(
+    fn cloud_tier_url(
         &self,
-        upstream: &Upstream,
+        cloud_tier: &CloudTier,
         model: &str,
         canon: &str,
         key: &CacheKey,
     ) -> String {
         format!(
-            "http://{}/vrules-rest/v1/embeddings/{}/{}/{}",
-            upstream.authority,
+            "{}/embeddings/{}/{}/{}",
+            cloud_tier.base_url.trim_end_matches('/'),
             cache_key::encode_path_segment(model),
             cache_key::encode_path_segment(canon),
             key.text_hash_hex()
         )
     }
 
-    /// Pull-through from the parent tier; any failure falls back to local
+    /// Fetch auth header from the auth plugin, if configured.
+    fn auth_header(&self) -> Result<Option<(String, String)>, String> {
+        let plugin = match &self.auth_plugin {
+            Some(plugin) => plugin,
+            None => return Ok(None),
+        };
+        let response = self.invoke(plugin, "get-auth-header", "{}")?;
+        let value: serde_json::Value = serde_json::from_str(&response)
+            .map_err(|e| format!("decode auth header response: {e}"))?;
+        let header = value["header"]
+            .as_str()
+            .ok_or_else(|| "auth response missing `header` field".to_string())?
+            .to_string();
+        let value = value["value"]
+            .as_str()
+            .ok_or_else(|| "auth response missing `value` field".to_string())?
+            .to_string();
+        Ok(Some((header, value)))
+    }
+
+    /// Pull-through from the cloud tier; any failure falls back to local
     /// inference.
-    fn upstream_fetch(
+    fn cloud_tier_fetch(
         &self,
         model: &str,
         canon: &str,
         key: &CacheKey,
         dims: Option<usize>,
     ) -> Option<Vec<f32>> {
-        let upstream = self.upstream.as_ref()?;
-        let url = self.upstream_url(upstream, model, canon, key);
-        let response = match upstream.client.get(&url).send() {
+        let cloud_tier = self.cloud_tier.as_ref()?;
+        let url = self.cloud_tier_url(cloud_tier, model, canon, key);
+        let mut request = cloud_tier.client.get(&url);
+        if let Some((header, value)) = self.auth_header().ok().flatten() {
+            request = request.header(&header, &value);
+        }
+        let response = match request.send() {
             Ok(response) => response,
             Err(error) => {
-                eprintln!("upstream cache tier fetch failed: {error}");
+                eprintln!("cloud tier fetch failed: {error}");
                 return None;
             }
         };
@@ -621,33 +650,35 @@ impl Services {
         let bytes = response.bytes().ok()?;
         let vector = cache_key::vector_from_le_bytes(&bytes)?;
         if dims.is_some_and(|dims| vector.len() != dims) {
-            eprintln!("upstream cache tier returned a dimension mismatch (ignored)");
+            eprintln!("cloud tier returned a dimension mismatch (ignored)");
             return None;
         }
         Some(vector)
     }
 
-    /// Best-effort write-up of a locally computed vector to the parent tier.
-    fn upstream_store(&self, model: &str, canon: &str, key: &CacheKey, vector: &[f32]) {
-        let Some(upstream) = self.upstream.as_ref() else {
+    /// Best-effort write-up of a locally computed vector to the cloud tier.
+    fn cloud_tier_store(&self, model: &str, canon: &str, key: &CacheKey, vector: &[f32]) {
+        let Some(cloud_tier) = self.cloud_tier.as_ref() else {
             return;
         };
-        let url = self.upstream_url(upstream, model, canon, key);
-        let result = upstream
+        let url = self.cloud_tier_url(cloud_tier, model, canon, key);
+        let mut request = cloud_tier
             .client
             .put(&url)
             .header("content-type", "application/octet-stream")
-            .body(cache_key::vector_to_le_bytes(vector))
-            .send();
-        match result {
+            .body(cache_key::vector_to_le_bytes(vector));
+        if let Some((header, value)) = self.auth_header().ok().flatten() {
+            request = request.header(&header, &value);
+        }
+        match request.send() {
             Ok(response) if !response.status().is_success() => {
                 eprintln!(
-                    "upstream cache tier write-up rejected: HTTP {}",
+                    "cloud tier write-up rejected: HTTP {}",
                     response.status().as_u16()
                 );
             }
             Ok(_) => {}
-            Err(error) => eprintln!("upstream cache tier write-up failed: {error}"),
+            Err(error) => eprintln!("cloud tier write-up failed: {error}"),
         }
     }
 

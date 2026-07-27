@@ -13,6 +13,7 @@ interface types {
         rules,
         storage,
         provider,
+        auth,
     }
 
     record plugin-descriptor {

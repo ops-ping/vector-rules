@@ -2,7 +2,7 @@
 name = "vrules-core"
 version.workspace = true
 edition.workspace = true
-description = "Deterministic Rust RETE policy engine with pluggable embeddings, canonicalization, forward chaining, and proof."
+description = "Reason like an AI without sacrificing determinism. A Rust RETE engine bridging semantic embeddings and forward chaining with mathematical precision."
 license.workspace = true
 repository.workspace = true
 readme = "README.md"

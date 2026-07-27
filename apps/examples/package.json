@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
-  "description": "Fully static, server-free demonstrations of the vrules browser runtime: in-browser EmbeddingGemma (wllama) plus the vrules-wasm rule engine, deployable to a plain object bucket.",
+  "description": "Demonstrations of vector-rules: in-browser EmbeddingGemma vectors and vrules-wasm rule engine reasoning across embeddings with mathematical precision.",
   "license": "MIT OR Apache-2.0",
   "repository": {
     "type": "git",

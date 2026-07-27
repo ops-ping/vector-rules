@@ -43,6 +43,9 @@ struct State {
 
 #[derive(Debug, Clone, Deserialize)]
 struct Config {
+    #[serde(default)]
+    mode: String,
+    #[serde(default = "default_project")]
     project: String,
     #[serde(default = "default_location")]
     location: String,
@@ -54,6 +57,16 @@ struct Config {
     credentials_file: Option<String>,
     #[serde(default)]
     access_token: Option<String>,
+}
+
+impl Config {
+    fn is_auth_mode(&self) -> bool {
+        self.mode.eq_ignore_ascii_case("auth")
+    }
+}
+
+fn default_project() -> String {
+    String::new()
 }
 
 enum Credential {
@@ -102,55 +115,86 @@ impl Guest for GcpComponent {
     fn initialize(config: String) -> Result<PluginDescriptor, String> {
         let config: Config =
             serde_json::from_str(&config).map_err(|e| format!("invalid GCP config: {e}"))?;
-        if config.project.trim().is_empty() {
-            return Err("GCP project must not be empty".to_string());
-        }
         let credential = load_credential(&config)?;
         STATE
             .set(Mutex::new(State {
-                config,
+                config: config.clone(),
                 credential,
                 token: None,
             }))
             .map_err(|_| "GCP component is already initialized".to_string())?;
-        Ok(PluginDescriptor {
-            id: "ai.vrules.grounding".to_string(),
-            version: env!("CARGO_PKG_VERSION").to_string(),
-            kind: PluginKind::Provider,
-            operations: vec!["Ground".to_string(), "Summarize".to_string()],
-        })
+        if config.is_auth_mode() {
+            Ok(PluginDescriptor {
+                id: "gcp-auth".to_string(),
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                kind: PluginKind::Auth,
+                operations: vec!["get-auth-header".to_string()],
+            })
+        } else {
+            if config.project.trim().is_empty() {
+                return Err("GCP project must not be empty".to_string());
+            }
+            Ok(PluginDescriptor {
+                id: "ai.vrules.grounding".to_string(),
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                kind: PluginKind::Provider,
+                operations: vec!["Ground".to_string(), "Summarize".to_string()],
+            })
+        }
     }
 
     fn invoke(operation: String, payload: String) -> Result<String, String> {
-        let args: Value =
-            serde_json::from_str(&payload).map_err(|e| format!("invalid GCP request: {e}"))?;
-        let effort = args.get("effort").and_then(Value::as_str).unwrap_or("low");
-        let (prompt, grounded) = match operation.as_str() {
-            "Ground" | "ground" | "web_ground" => {
-                (required_string(&args, "query")?.to_string(), true)
+        let s = state()?;
+        let mut state_guard = s.lock().map_err(|_| "GCP lock poisoned")?;
+        if state_guard.config.is_auth_mode() {
+            match operation.as_str() {
+                "get-auth-header" => {
+                    let token = access_token(&mut state_guard)?;
+                    Ok(json!({ "header": "authorization", "value": format!("Bearer {token}") }).to_string())
+                }
+                other => return Err(format!("unsupported auth operation `{other}`")),
             }
-            "Summarize" | "summarize" => (
-                format!(
-                    "Summarize the following concisely:\n\n{}",
-                    required_string(&args, "content")?
+        } else {
+            let args: Value =
+                serde_json::from_str(&payload).map_err(|e| format!("invalid GCP request: {e}"))?;
+            let effort = args.get("effort").and_then(Value::as_str).unwrap_or("low");
+            let (prompt, grounded) = match operation.as_str() {
+                "Ground" | "ground" | "web_ground" => {
+                    (required_string(&args, "query")?.to_string(), true)
+                }
+                "Summarize" | "summarize" => (
+                    format!(
+                        "Summarize the following concisely:\n\n{}",
+                        required_string(&args, "content")?
+                    ),
+                    false,
                 ),
-                false,
-            ),
-            other => return Err(format!("unsupported GCP operation `{other}`")),
-        };
-        let text = generate(&prompt, grounded, effort)?;
-        Ok(json!({ "text": text }).to_string())
+                other => return Err(format!("unsupported GCP operation `{other}`")),
+            };
+            drop(state_guard);
+            let text = generate(&prompt, grounded, effort)?;
+            Ok(json!({ "text": text }).to_string())
+        }
     }
 }
 
 fn generate(prompt: &str, grounded: bool, effort: &str) -> Result<String, String> {
     let mut state = state()?.lock().map_err(|_| "GCP lock poisoned")?;
+    generate_with_state(&mut state, prompt, grounded, effort)
+}
+
+fn generate_with_state(
+    state: &mut State,
+    prompt: &str,
+    grounded: bool,
+    effort: &str,
+) -> Result<String, String> {
     let model = if effort.eq_ignore_ascii_case("high") {
         state.config.model_high.clone()
     } else {
         state.config.model_standard.clone()
     };
-    let token = access_token(&mut state)?;
+    let token = access_token(state)?;
     let host = if state.config.location == "global" {
         "aiplatform.googleapis.com".to_string()
     } else {

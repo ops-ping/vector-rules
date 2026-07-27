@@ -97,19 +97,21 @@ and the `vrules-rest` routes all reach the real embedding model through the
 same cache-through host path:
 
 ```text
-local cache -> optional parent vrules-rest tier -> embedding inference
-     ^                                              |
-     +------------------- write-back ---------------+
+local cache -> optional cloud tier -> embedding inference
+     ^                                  |
+     +----------- write-back -----------+
 ```
 
 The content key combines the embedding-model revision, canonicalization
 namespace, and text content. Identical text therefore reuses one vector within
 the same model and canonicalization contract. Changing the model revision or
 supplying a new canonicalization namespace selects a different keyspace instead
-of serving stale coordinates. A local miss can pull from a configured parent
-tier; only a miss at every tier runs inference. Newly computed vectors are
-written locally and, when configured, back to the parent so other nodes can
-reuse them.
+of serving stale coordinates. A local miss can pull from a configured cloud
+tier via `VRULES_REST_URL`; only a miss at every tier runs inference. Newly
+computed vectors are written locally and, when configured, back to the cloud
+tier so other nodes can reuse them. Authentication for the cloud tier is
+delegated to the configured `auth_plugin` (e.g. GCP, AWS) which generates
+the appropriate `Authorization` header for each request.
 
 Cache entries are append-only. Expiration appends an epoch change and makes
 older generations non-live rather than deleting their records, so cache state

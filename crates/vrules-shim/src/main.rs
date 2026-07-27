@@ -88,10 +88,10 @@ fn main() -> anyhow::Result<()> {
         Mode::Stdio => ComponentOutput::Stdio,
         Mode::Daemon(_) => ComponentOutput::Daemon,
     };
-    let upstream = std::env::var("VRULES_REST_UPSTREAM")
+    let rest_url = std::env::var("VRULES_REST_URL")
         .ok()
         .filter(|value| !value.trim().is_empty());
-    let host = RuntimeHost::load(manifest, output, upstream)?;
+    let host = RuntimeHost::load(manifest, output, rest_url)?;
     match args.mode {
         Mode::Stdio => run_stdio(host),
         Mode::Daemon(bind) => tokio::runtime::Builder::new_multi_thread()
