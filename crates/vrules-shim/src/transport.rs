@@ -555,10 +555,9 @@ async fn mcp_socket(mut socket: WebSocket, state: AppState, identity: Identity) 
                 let identity = identity.clone();
                 let request = text.to_string();
                 let request_for_call = request.clone();
-                let response = tokio::task::spawn_blocking(move || {
-                    host.mcp(&request_for_call, &identity)
-                })
-                .await;
+                let response =
+                    tokio::task::spawn_blocking(move || host.mcp(&request_for_call, &identity))
+                        .await;
                 match response {
                     Ok(Ok(Some(response))) => {
                         if socket.send(Message::Text(response.into())).await.is_err() {

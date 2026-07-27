@@ -150,7 +150,10 @@ impl Guest for GcpComponent {
             match operation.as_str() {
                 "get-auth-header" => {
                     let token = access_token(&mut state_guard)?;
-                    Ok(json!({ "header": "authorization", "value": format!("Bearer {token}") }).to_string())
+                    Ok(
+                        json!({ "header": "authorization", "value": format!("Bearer {token}") })
+                            .to_string(),
+                    )
                 }
                 other => return Err(format!("unsupported auth operation `{other}`")),
             }
