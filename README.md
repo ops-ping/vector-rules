@@ -4,9 +4,9 @@
 
 `vector-rules` bridges meaning embedded in any media seamlessly across GitOps-managed policy requirements with mathematical precision rather than prompts.
 
-vector-rules turns meaning found in documents, messages, events, and records into deterministic, governed decisions. It combines embeddings, which measure semantic relationships in content, with a rules engine, which applies explicit organizational policy to those measurements and ordinary application facts.
+**Turn meaning** found in documents, messages, events, and records into deterministic, governed decisions. This framework combines embeddings, which measure semantic relationships in content, with a rules engine that applies explicit organizational policy to those measurements alongside ordinary application facts.
 
-LLMs are good at interpreting language, generating candidates, and summarizing complex information. They are not, by themselves, a reviewable or auditable source of production policy. When an LLM makes an operational decision, asking it "why?" yields a hallucinated rationalization rather than a verifiable explanation. vector-rules puts a deterministic, GitOps-managed rule layer between fuzzy inputs and operational actions so behavior can be tested, traced, audited, replayed, and rolled back.
+LLMs are excellent at interpreting language, generating candidates, and summarizing complex information, **but they are not a reviewable or auditable source of production policy.** When an LLM makes an operational decision, asking it "why?" yields a hallucinated rationalization rather than a verifiable explanation. By inserting a deterministic, GitOps-managed rule layer between fuzzy inputs and operational actions, `vector-rules` ensures your AI-driven behavior can be tested, traced, audited, replayed, and rolled back.
 
 The project is fully open source, vendor-neutral, local-first, and embeddable. The same rule semantics can govern an MCP component host, run inside a Rust application, evaluate stateful streams, and power browser-side what-if analysis through WebAssembly. Organizations keep their policy in Git and can move it across models, clients, and deployment environments without depending on a proprietary control plane.
 
