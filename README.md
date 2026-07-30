@@ -128,18 +128,25 @@ In addition to string arguments, vector functions like `s_cosine` and `s_dot` ac
 * **Classic Analogy Example:** Evaluate `(king − man + woman) ≈ queen` natively in GRL:
 
 ```grl
-rule "EvaluateVectorAnalogy" no-loop {
+rule "MeasureAnalogy" salience 100 no-loop {
     when
         Concept.target != ""
     then
         Concept.similarity = s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], Concept.target);
 }
 
-rule "AnalogyMatch" no-loop {
+rule "AnalogyCategory" salience 50 no-loop {
     when
         Concept.similarity > 0.80
     then
-        Decision.is_analogy_target = true;
+        Concept.category = "royalty";
+}
+
+rule "GrantRoyalAccess" no-loop {
+    when
+        Concept.category == "royalty"
+    then
+        Decision.access_granted = true;
 }
 ```
 

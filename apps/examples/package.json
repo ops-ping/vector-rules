@@ -16,10 +16,12 @@
     "prebuild": "npm run build:wasm",
     "build": "vite build",
     "preview": "vite preview",
-    "seed": "node scripts/seed-cache.mjs"
+    "seed": "node scripts/seed-cache.mjs",
+    "screenshots": "node scripts/capture-screenshots.mjs"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "7.1.2",
+    "puppeteer": "^24.3.0",
     "svelte": "5.56.4",
     "vite": "8.1.0"
   },

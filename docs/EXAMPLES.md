@@ -24,9 +24,9 @@ evidence, fired rules, and the parsed components.
 
 ## Semantic rules
 
-GRL vector functions evaluate over real EmbeddingGemma vectors with Lisp-style vector algebra syntax sugar (e.g., `v:add`, `v:sub`). Function names carry their return kind — `s_` raw scalar (a measurement, never thresholded), `c_` calibrated (thresholdable), `b_` boolean, `m_` metadata — and the engine's load-time lint rejects thresholding a raw score directly. A measurement rule writes `s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], target)` into a fact; a decision rule thresholds the fact; and forward chaining carries a contrast measurement through a derived category into a final decision.
+GRL vector functions evaluate over real EmbeddingGemma vectors with Lisp-style vector algebra syntax sugar (e.g., `v:add`, `v:sub`). Function names carry their return kind — `s_` raw scalar (a measurement, never thresholded), `c_` calibrated (thresholdable), `b_` boolean, `m_` metadata — and the engine's load-time lint rejects thresholding a raw score directly. A measurement rule writes `s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], target)` into a fact; an intermediate rule thresholds the similarity score to derive a category; and a decision rule fires on the derived category to grant access.
 
-![Semantic similarity scores over EmbeddingGemma vectors, with a forward-chaining trace from measurement to decision](examples-semantic.png)
+![Semantic similarity scores over EmbeddingGemma vectors, with a forward-chaining trace from inline vector algebra to deterministic decision](examples-semantic.png)
 
 ## Fraud triage
 

@@ -76,11 +76,38 @@
       status = 'fetching embeddings and model metadata from the host…';
       const next = [];
 
-      // 1) Vector analogy algebra: s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], Concept.target)
+      // 1) Vector analogy algebra across candidate targets:
+      //    s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], Concept.target)
       const [king, man, woman] = await Promise.all(
         ['king', 'man', 'woman'].map((w) => embed(w))
       );
       const analogyRules = `rule "MeasureAnalogy" salience 100 no-loop {
+    when
+        Concept.target != ""
+    then
+        Concept.similarity = s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], Concept.target);
+}
+
+rule "AnalogyCategory" salience 50 no-loop {
+    when
+        Concept.similarity > 0.80
+    then
+        Concept.category = "royalty";
+}
+
+rule "GrantRoyalAccess" no-loop {
+    when
+        Concept.category == "royalty"
+    then
+        Decision.access_granted = true;
+}`;
+
+      let queenCos = '0.000';
+
+      for (const target of ['queen', 'princess', 'king', 'tractor']) {
+        const tv = await embed(target);
+        const eng = new RuleEngine();
+        eng.register_rule(`rule "MeasureAnalogy" salience 100 no-loop {
     when
         Concept.target != ""
     then
@@ -92,11 +119,7 @@ rule "AnalogyMatch" no-loop {
         Concept.similarity > 0.80
     then
         Decision.is_analogy_target = true;
-}`;
-      for (const target of ['queen', 'princess', 'king', 'tractor']) {
-        const tv = await embed(target);
-        const eng = new RuleEngine();
-        eng.register_rule(analogyRules);
+}`);
         setEmbedding(eng, 'king', king);
         setEmbedding(eng, 'man', man);
         setEmbedding(eng, 'woman', woman);
@@ -107,96 +130,68 @@ rule "AnalogyMatch" no-loop {
           analogyVec[i] = king.vector[i] - man.vector[i] + woman.vector[i];
         }
         const cos = cosine(analogyVec, tv.vector).toFixed(3);
+        if (target === 'queen') queenCos = cos;
         next.push({
           headline: target,
           cos,
           fired: (res.fired || []).includes('AnalogyMatch'),
-          rule: analogyRules,
+          rule: `rule "MeasureAnalogy" salience 100 no-loop {\n    when\n        Concept.target != ""\n    then\n        Concept.similarity = s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], Concept.target);\n}\n\nrule "AnalogyMatch" no-loop {\n    when\n        Concept.similarity > 0.80\n    then\n        Decision.is_analogy_target = true;\n}`,
           exprText: `Concept { target: "${target}" }\nConcept.similarity = s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], "${target}") = ${cos}\nthreshold: Concept.similarity > 0.80`,
           result: res,
           open: false
         });
       }
 
-      // 2) Contrast: which side of the king↔man axis does the word sit on?
-      //    s_contrast(x, pos, neg) = cos(x, pos) − cos(x, neg); the shared
-      //    topic component cancels, isolating the polarity direction.
+      // 2) Forward chaining — inline vector math writes similarity into a fact,
+      //    the category rule thresholds it, and the decision rule grants access.
       const queen = await embed('queen');
-      const contrastRules = `rule "MeasurePolarity" salience 100 no-loop {
+      const chainRules = [
+        `rule "MeasureAnalogy" salience 100 no-loop {
     when
-        Concept.word != ""
+        Concept.target != ""
     then
-        Concept.polarity = s_contrast(Concept.word, "king", "man");
-}
-
-rule "RoyalSide" no-loop {
+        Concept.similarity = s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], Concept.target);
+}`,
+        `rule "AnalogyCategory" salience 50 no-loop {
     when
-        Concept.polarity > 0.05
-    then
-        Decision.royal_side = true;
-}`;
-      const eng = new RuleEngine();
-      eng.register_rule(contrastRules);
-      setEmbedding(eng, 'king', king);
-      setEmbedding(eng, 'man', man);
-      setEmbedding(eng, 'queen', queen);
-      const ares = deep(eng.evaluate('Concept', JSON.stringify({ word: 'queen' }), true));
-      const contrast = (cosine(queen.vector, king.vector) - cosine(queen.vector, man.vector)).toFixed(3);
-      next.push({
-        headline: 'queen on the king↔man contrast axis',
-        cos: contrast,
-        fired: (ares.fired || []).includes('RoyalSide'),
-        rule: contrastRules,
-        exprText: `Concept { word: "queen" }\nConcept.polarity = s_contrast("queen", "king", "man") = ${contrast}\nthreshold: Concept.polarity > 0.05`,
-        result: ares,
-        open: false
-      });
-
-      // 3) Forward chaining — the measurement writes a fact, the decision rule
-      //    derives category, and a third rule fires on the derived category.
-      //    All in one canonical evaluation.
-      const chainRules = [`rule "MeasurePolarity" salience 100 no-loop {
-    when
-        Concept.word != ""
-    then
-        Concept.polarity = s_contrast(Concept.word, "king", "man");
-}`, `rule "RoyalCategory" salience 50 no-loop {
-    when
-        Concept.polarity > 0.05
+        Concept.similarity > 0.80
     then
         Concept.category = "royalty";
-}`, `rule "GrantRoyalAccess" no-loop {
+}`,
+        `rule "GrantRoyalAccess" no-loop {
     when
         Concept.category == "royalty"
     then
         Decision.access_granted = true;
-}`];
+}`
+      ];
       const ceng = new RuleEngine();
       for (const rule of chainRules) ceng.register_rule(rule);
       setEmbedding(ceng, 'king', king);
       setEmbedding(ceng, 'man', man);
+      setEmbedding(ceng, 'woman', woman);
       setEmbedding(ceng, 'queen', queen);
-      const cres = deep(ceng.evaluate('Concept', JSON.stringify({ word: 'queen' }), true));
+      const cres = deep(ceng.evaluate('Concept', JSON.stringify({ target: 'queen' }), true));
       const firedC = cres.fired || [];
       chain = {
-        fact: 'Concept { word: "queen" }',
+        fact: 'Concept { target: "queen" }',
         fired: firedC,
         rules: chainRules,
         result: cres,
         open: false,
         steps: [
           {
-            rule: 'MeasurePolarity',
-            cond: 'Concept.word != ""',
-            derives: `Concept.polarity = s_contrast(word, king, man) = ${contrast}`,
-            fired: firedC.includes('MeasurePolarity'),
+            rule: 'MeasureAnalogy',
+            cond: 'Concept.target != ""',
+            derives: `Concept.similarity = s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], "queen") = ${queenCos}`,
+            fired: firedC.includes('MeasureAnalogy'),
             chained: false
           },
           {
-            rule: 'RoyalCategory',
-            cond: `Concept.polarity = ${contrast} > 0.05`,
+            rule: 'AnalogyCategory',
+            cond: `Concept.similarity = ${queenCos} > 0.80`,
             derives: 'Concept.category = "royalty"',
-            fired: firedC.includes('RoyalCategory'),
+            fired: firedC.includes('AnalogyCategory'),
             chained: true
           },
           {
@@ -274,11 +269,11 @@ rule "RoyalSide" no-loop {
   </div>
 
   {#if chain}
-    <h3 class="chain-title">Forward chaining — measurement derives facts that drive decisions</h3>
+    <h3 class="chain-title">Forward chaining — inline vector algebra drives deterministic decisions</h3>
     <p class="muted">
-      One canonical evaluation in this wasm engine. <code>MeasurePolarity</code> writes the
-      contrast score, <code>RoyalCategory</code> derives a category from it, and
-      <code>GrantRoyalAccess</code> fires on the derived category.
+      One canonical evaluation in this wasm engine. <code>MeasureAnalogy</code> evaluates inline vector algebra
+      <code>s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], target)</code>, <code>AnalogyCategory</code>
+      derives a category from the threshold, and <code>GrantRoyalAccess</code> fires on the derived category.
     </p>
     <div
       class="chain"
