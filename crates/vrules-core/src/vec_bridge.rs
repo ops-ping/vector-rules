@@ -209,10 +209,9 @@ fn eval_vec_val(embedder: &dyn Embedder, val: &RuleValue) -> RuleResult<Vec<f32>
                 return Err(eval_err("vector array cannot be empty"));
             }
 
-            let is_raw_floats = arr.iter().all(|item| match item {
-                RuleValue::Number(_) | RuleValue::Integer(_) => true,
-                _ => false,
-            });
+            let is_raw_floats = arr
+                .iter()
+                .all(|item| matches!(item, RuleValue::Number(_) | RuleValue::Integer(_)));
 
             if is_raw_floats {
                 let vec: Vec<f32> = arr
