@@ -421,9 +421,11 @@ impl WasmStreamProcessor {
             _ => WindowType::Sliding,
         };
 
-        let mut config = StreamConfig::default();
-        config.window_type = window_type;
-        config.window_duration = std::time::Duration::from_millis(window_ms);
+        let config = StreamConfig {
+            window_type,
+            window_duration: std::time::Duration::from_millis(window_ms),
+            ..Default::default()
+        };
 
         let processor = StreamProcessor::with_engine(config, RustRuleEngine::new(kb));
 
@@ -489,7 +491,7 @@ impl WasmStreamProcessor {
         if let Some(model) = &self.model_id {
             let embedder: Arc<dyn Embedder> = Arc::new(
                 PrefetchedEmbedder::new(self.prefetched.clone(), model.clone())
-                    .map_err(|e| js_error(e))?,
+                    .map_err(js_error)?,
             );
             let _ = register_vector_functions(
                 self.processor.rule_engine_mut(),
