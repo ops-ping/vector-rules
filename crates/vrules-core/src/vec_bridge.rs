@@ -177,7 +177,10 @@ pub fn register_vector_functions(
             require_len(args, 1, "v")?;
             let vector = eval_vec_val(&*f, &args[0])?;
             Ok(RuleValue::Array(
-                vector.into_iter().map(|n| RuleValue::Number(f64::from(n))).collect(),
+                vector
+                    .into_iter()
+                    .map(|n| RuleValue::Number(f64::from(n)))
+                    .collect(),
             ))
         },
     );
@@ -229,7 +232,7 @@ fn eval_vec_val(embedder: &dyn Embedder, val: &RuleValue) -> RuleResult<Vec<f32>
                     return Err(eval_err(format!(
                         "vector operation first element must be an operator string, got {:?}",
                         arr[0]
-                    )))
+                    )));
                 }
             };
 
@@ -359,8 +362,8 @@ fn eval_err(message: impl Into<String>) -> RuleEngineError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use em_log_n::embed::ModelId;
     use em_log_n::Error;
+    use em_log_n::embed::ModelId;
 
     struct MockEmbedder;
     impl Embedder for MockEmbedder {

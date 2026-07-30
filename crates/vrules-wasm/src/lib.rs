@@ -10,13 +10,11 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 
 use em_log_n::embed::{Embedder, ModelId};
-use rust_rule_engine::streaming::{
-    StreamConfig, StreamEvent, StreamProcessor, WindowType,
-};
+use rust_rule_engine::streaming::{StreamConfig, StreamEvent, StreamProcessor, WindowType};
 use rust_rule_engine::types::{FunctionMeta, ReturnKind};
 use rust_rule_engine::{Facts, RuleEngineError, RustRuleEngine, Value as RuleValue};
-use vrules_core::canon::{CanonKind, CanonRouter, register_canon_functions};
 use vrules_canon::canonicalize;
+use vrules_core::canon::{CanonKind, CanonRouter, register_canon_functions};
 use vrules_core::geometry::{ArtifactStore, Axis, Calibration, Provenance, Region};
 use vrules_core::{
     AddressIndex, EvalOutcome, RuleEvaluator, Ruleset, add_json_fact, address_index_record,
@@ -402,10 +400,14 @@ pub struct WasmStreamProcessor {
 #[wasm_bindgen]
 impl WasmStreamProcessor {
     #[wasm_bindgen(constructor)]
-    pub fn new(grl: &str, window_type_str: &str, window_ms: u64) -> Result<WasmStreamProcessor, JsValue> {
+    pub fn new(
+        grl: &str,
+        window_type_str: &str,
+        window_ms: u64,
+    ) -> Result<WasmStreamProcessor, JsValue> {
         console_error_panic_hook::set_once();
-        let rules_vec = rust_rule_engine::GRLParser::parse_rules(grl)
-            .map_err(|e| js_error(e.to_string()))?;
+        let rules_vec =
+            rust_rule_engine::GRLParser::parse_rules(grl).map_err(|e| js_error(e.to_string()))?;
         let kb = rust_rule_engine::KnowledgeBase::new("WasmStreamKB");
         for r in rules_vec {
             kb.add_rule(r).map_err(|e| js_error(e.to_string()))?;
@@ -443,8 +445,8 @@ impl WasmStreamProcessor {
         revision: &str,
         dim: usize,
     ) -> Result<(), JsValue> {
-        let model = ModelId::from_sha256(model_name, revision, dim)
-            .map_err(|e| js_error(e.to_string()))?;
+        let model =
+            ModelId::from_sha256(model_name, revision, dim).map_err(|e| js_error(e.to_string()))?;
         if let Some(existing) = &self.model_id {
             if existing != &model {
                 return Err(js_error(
@@ -465,15 +467,15 @@ impl WasmStreamProcessor {
         let event_val: serde_json::Value = serde_json::from_str(event_json)
             .map_err(|e| JsValue::from_str(&format!("invalid event JSON: {e}")))?;
 
-        let event_type = event_val.get("event_type")
+        let event_type = event_val
+            .get("event_type")
             .and_then(Value::as_str)
             .unwrap_or("Event");
-        let source = event_val.get("source")
+        let source = event_val
+            .get("source")
             .and_then(Value::as_str)
             .unwrap_or("wasm_stream");
-        let data_obj = event_val.get("data")
-            .cloned()
-            .unwrap_or_else(|| json!({}));
+        let data_obj = event_val.get("data").cloned().unwrap_or_else(|| json!({}));
 
         let mut data_map = std::collections::HashMap::new();
         if let Value::Object(obj) = data_obj {
@@ -500,7 +502,9 @@ impl WasmStreamProcessor {
             );
         }
 
-        let res = self.processor.process_event(event)
+        let res = self
+            .processor
+            .process_event(event)
             .map_err(|e| js_error(e.to_string()))?;
 
         let fired = res.fired_rules.clone();
