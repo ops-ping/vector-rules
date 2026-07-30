@@ -10,14 +10,19 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 
 use em_log_n::embed::{Embedder, ModelId};
+use rust_rule_engine::streaming::{
+    StreamConfig, StreamEvent, StreamProcessor, WindowType,
+};
 use rust_rule_engine::types::{FunctionMeta, ReturnKind};
 use rust_rule_engine::{Facts, RuleEngineError, RustRuleEngine, Value as RuleValue};
 use vrules_core::canon::{CanonKind, CanonRouter, register_canon_functions};
+use vrules_canon::canonicalize;
 use vrules_core::geometry::{ArtifactStore, Axis, Calibration, Provenance, Region};
 use vrules_core::{
     AddressIndex, EvalOutcome, RuleEvaluator, Ruleset, add_json_fact, address_index_record,
-    address_policy_fact, register_vector_functions, standardize_structured_address,
-    standardize_structured_with_index, standardize_unstructured_address,
+    address_policy_fact, facts_to_json, json_to_rule_value, register_vector_functions,
+    standardize_structured_address, standardize_structured_with_index,
+    standardize_unstructured_address,
 };
 
 use wasm_bindgen::prelude::*;
@@ -382,6 +387,132 @@ fn normalize_reference_text(text: &str) -> String {
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// Browser-side GRL Stream Processor for real-time event stream evaluation with sliding/tumbling windows.
+#[wasm_bindgen]
+pub struct WasmStreamProcessor {
+    processor: StreamProcessor,
+    prefetched: std::collections::HashMap<String, Vec<f32>>,
+    model_id: Option<ModelId>,
+    canon_router: Arc<CanonRouter>,
+    artifacts: Arc<ArtifactStore>,
+}
+
+#[wasm_bindgen]
+impl WasmStreamProcessor {
+    #[wasm_bindgen(constructor)]
+    pub fn new(grl: &str, window_type_str: &str, window_ms: u64) -> Result<WasmStreamProcessor, JsValue> {
+        console_error_panic_hook::set_once();
+        let rules_vec = rust_rule_engine::GRLParser::parse_rules(grl)
+            .map_err(|e| js_error(e.to_string()))?;
+        let kb = rust_rule_engine::KnowledgeBase::new("WasmStreamKB");
+        for r in rules_vec {
+            kb.add_rule(r).map_err(|e| js_error(e.to_string()))?;
+        }
+
+        let window_type = match window_type_str.to_lowercase().as_str() {
+            "tumbling" => WindowType::Tumbling,
+            "session" => WindowType::Session {
+                timeout: std::time::Duration::from_millis(window_ms),
+            },
+            _ => WindowType::Sliding,
+        };
+
+        let mut config = StreamConfig::default();
+        config.window_type = window_type;
+        config.window_duration = std::time::Duration::from_millis(window_ms);
+
+        let processor = StreamProcessor::with_engine(config, RustRuleEngine::new(kb));
+
+        Ok(WasmStreamProcessor {
+            processor,
+            prefetched: std::collections::HashMap::new(),
+            model_id: None,
+            canon_router: Arc::new(CanonRouter::new()),
+            artifacts: Arc::new(ArtifactStore::default()),
+        })
+    }
+
+    /// Provide a prefetched embedding vector for a string text.
+    pub fn set_embedding(
+        &mut self,
+        text: &str,
+        vector: &[f32],
+        model_name: &str,
+        revision: &str,
+        dim: usize,
+    ) -> Result<(), JsValue> {
+        let model = ModelId::from_sha256(model_name, revision, dim)
+            .map_err(|e| js_error(e.to_string()))?;
+        if let Some(existing) = &self.model_id {
+            if existing != &model {
+                return Err(js_error(
+                    "cannot mix embeddings from different models in the same StreamProcessor",
+                ));
+            }
+        } else {
+            self.model_id = Some(model);
+        }
+        let canonical = canonicalize(text).canonical;
+        self.prefetched.insert(canonical, vector.to_vec());
+        Ok(())
+    }
+
+    /// Process a stream event JSON e.g. `{ "event_type": "Payment", "data": { "Amount": 1000 }, "source": "web" }`
+    /// Returns the processing result as JSON.
+    pub fn process_event(&mut self, event_json: &str) -> Result<JsValue, JsValue> {
+        let event_val: serde_json::Value = serde_json::from_str(event_json)
+            .map_err(|e| JsValue::from_str(&format!("invalid event JSON: {e}")))?;
+
+        let event_type = event_val.get("event_type")
+            .and_then(Value::as_str)
+            .unwrap_or("Event");
+        let source = event_val.get("source")
+            .and_then(Value::as_str)
+            .unwrap_or("wasm_stream");
+        let data_obj = event_val.get("data")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+
+        let mut data_map = std::collections::HashMap::new();
+        if let Value::Object(obj) = data_obj {
+            for (k, v) in obj {
+                data_map.insert(k, json_to_rule_value(&v));
+            }
+        }
+
+        let event = StreamEvent::new(event_type, data_map, source);
+
+        if let Some(model) = &self.model_id {
+            let embedder: Arc<dyn Embedder> = Arc::new(
+                PrefetchedEmbedder::new(self.prefetched.clone(), model.clone())
+                    .map_err(|e| js_error(e))?,
+            );
+            let _ = register_vector_functions(
+                self.processor.rule_engine_mut(),
+                Arc::clone(&embedder),
+                Arc::clone(&self.artifacts),
+            );
+            register_canon_functions(
+                self.processor.rule_engine_mut(),
+                Arc::clone(&self.canon_router),
+            );
+        }
+
+        let res = self.processor.process_event(event)
+            .map_err(|e| js_error(e.to_string()))?;
+
+        let fired = res.fired_rules.clone();
+        let out = json!({
+            "event_id": res.event_id,
+            "status": format!("{:?}", res.status),
+            "fired_rules": fired,
+            "facts": facts_to_json(&res.facts),
+        });
+
+        serde_wasm_bindgen::to_value(&out).map_err(|e| JsValue::from_str(&e.to_string()))
+    }
 }
 
 /// Browser-side GRL evaluator.

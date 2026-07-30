@@ -76,38 +76,43 @@
       status = 'fetching embeddings and model metadata from the host…';
       const next = [];
 
-      // 1) Semantic similarity, in the layered idiom: `s_cosine` is a raw
-      //    geometry score, so a measurement rule assigns it to a fact and a
-      //    decision rule thresholds the fact. Thresholding s_cosine directly
-      //    in `when` is rejected at rule load ("raw scalar needs calibration").
-      const royalty = await embed('royalty');
-      const simRules = `rule "MeasureRoyalty" salience 100 no-loop {
+      // 1) Vector analogy algebra: s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], Concept.target)
+      const [king, man, woman] = await Promise.all(
+        ['king', 'man', 'woman'].map((w) => embed(w))
+      );
+      const analogyRules = `rule "MeasureAnalogy" salience 100 no-loop {
     when
-        Concept.word != ""
+        Concept.target != ""
     then
-        Concept.royal_sim = s_cosine(Concept.word, "royalty");
+        Concept.similarity = s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], Concept.target);
 }
 
-rule "AboutRoyalty" no-loop {
+rule "AnalogyMatch" no-loop {
     when
-        Concept.royal_sim > 0.80
+        Concept.similarity > 0.80
     then
-        Decision.about_royalty = true;
+        Decision.is_analogy_target = true;
 }`;
-      for (const word of ['king', 'queen', 'banana', 'tractor']) {
-        const wv = await embed(word);
+      for (const target of ['queen', 'princess', 'king', 'tractor']) {
+        const tv = await embed(target);
         const eng = new RuleEngine();
-        eng.register_rule(simRules);
-        setEmbedding(eng, 'royalty', royalty);
-        setEmbedding(eng, word, wv);
-        const res = deep(eng.evaluate('Concept', JSON.stringify({ word }), true));
-        const cos = cosine(wv.vector, royalty.vector).toFixed(3);
+        eng.register_rule(analogyRules);
+        setEmbedding(eng, 'king', king);
+        setEmbedding(eng, 'man', man);
+        setEmbedding(eng, 'woman', woman);
+        setEmbedding(eng, target, tv);
+        const res = deep(eng.evaluate('Concept', JSON.stringify({ target }), true));
+        const analogyVec = new Float32Array(king.vector.length);
+        for (let i = 0; i < king.vector.length; i++) {
+          analogyVec[i] = king.vector[i] - man.vector[i] + woman.vector[i];
+        }
+        const cos = cosine(analogyVec, tv.vector).toFixed(3);
         next.push({
-          headline: word,
+          headline: target,
           cos,
-          fired: (res.fired || []).includes('AboutRoyalty'),
-          rule: simRules,
-          exprText: `Concept { word: "${word}" }\nConcept.royal_sim = s_cosine("${word}", "royalty") = ${cos}\nthreshold: Concept.royal_sim > 0.80`,
+          fired: (res.fired || []).includes('AnalogyMatch'),
+          rule: analogyRules,
+          exprText: `Concept { target: "${target}" }\nConcept.similarity = s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], "${target}") = ${cos}\nthreshold: Concept.similarity > 0.80`,
           result: res,
           open: false
         });
@@ -116,9 +121,7 @@ rule "AboutRoyalty" no-loop {
       // 2) Contrast: which side of the king↔man axis does the word sit on?
       //    s_contrast(x, pos, neg) = cos(x, pos) − cos(x, neg); the shared
       //    topic component cancels, isolating the polarity direction.
-      const [king, man, queen] = await Promise.all(
-        ['king', 'man', 'queen'].map((w) => embed(w))
-      );
+      const queen = await embed('queen');
       const contrastRules = `rule "MeasurePolarity" salience 100 no-loop {
     when
         Concept.word != ""
@@ -207,7 +210,7 @@ rule "RoyalSide" no-loop {
       };
 
       rows = next;
-      dim = royalty.vector.length;
+      dim = king.vector.length;
       status = `done — dim ${dim}, vectors and model identity supplied by the host.`;
     } catch (e) {
       status = '';
@@ -238,11 +241,10 @@ rule "RoyalSide" no-loop {
   {#if error}<div class="error">Error: {error}</div>{/if}
 
   {#if rows.length}
-    <h3 class="section-title">Layered similarity — is each word about <code>"royalty"</code>?</h3>
+    <h3 class="section-title">Vector Analogy Algebra — <code>(king − man + woman) ≈ target</code></h3>
     <p class="muted">
-      A measurement rule assigns <code>s_cosine(word, "royalty")</code> to a fact in
-      <code>then</code>; the decision rule thresholds the fact. The engine's load-time lint
-      rejects thresholding the raw score directly in <code>when</code>.
+      A measurement rule evaluates Lisp-style vector math <code>s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], target)</code> in
+      <code>then</code>; the decision rule thresholds the fact.
     </p>
   {/if}
 

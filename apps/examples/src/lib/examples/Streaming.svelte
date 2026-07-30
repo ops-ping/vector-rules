@@ -1,13 +1,16 @@
 <script>
-  import init, { RuleEngine } from 'vrules-wasm/vrules_wasm.js';
+  import init, { RuleEngine, WasmStreamProcessor } from 'vrules-wasm/vrules_wasm.js';
   import wasmUrl from 'vrules-wasm/vrules_wasm_bg.wasm?url';
 
-  let events = $state(5000);
+  let events = $state(10000);
   let highPercent = $state(35);
+  let windowType = $state('sliding'); // sliding vs tumbling
+  let windowDurationMs = $state(5000);
   let rows = $state([]);
   let status = $state('');
   let error = $state('');
   let busy = $state(false);
+  let streamSummary = $state(null);
 
   let initPromise;
   function ensureWasm() {
@@ -36,46 +39,69 @@
       let p;
       [seed, p] = nextPercent(seed);
       const high = p < pct;
-      out.push({ fact: { cpu_pct: high ? 95 : 20, timestamp_ms: i }, expect: high });
+      out.push({
+        event_type: "SystemMetric",
+        source: "telemetry",
+        data: { cpu_pct: high ? 95 : 20, timestamp_ms: i * 10 },
+        expect: high
+      });
     }
     return out;
   }
 
-  function summarize(name, total, correct, started) {
-    const elapsedMs = performance.now() - started;
-    return {
-      name,
-      total,
-      correct,
-      accuracy: correct / total,
-      eps: total / (elapsedMs / 1000),
-      elapsedMs
-    };
-  }
-
   async function run() {
-    busy = true; error = ''; rows = []; status = 'loading wasm…';
+    busy = true; error = ''; rows = []; streamSummary = null; status = 'loading wasm…';
     try {
       await ensureWasm();
       const samples = workload(Number(events), Number(highPercent));
-      const rule = `rule "HighCpu" no-loop {
+
+      const streamGrl = `rule "HighCpuAlert" no-loop {
     when
-        Metric.cpu_pct > 80
+        SystemMetric.cpu_pct > 80
     then
-        Decision.high_cpu = true;
+        Alert.level = "HIGH";
+        Alert.message = "CPU spike in stream window";
 }`;
 
-      status = 'evaluating sequential inputs…';
-      const engine = new RuleEngine();
-      engine.register_rule(rule);
+      status = `evaluating ${samples.length} stream events with ${windowType} window (${windowDurationMs}ms)…`;
+      
+      const processor = new WasmStreamProcessor(streamGrl, windowType, BigInt(windowDurationMs));
       let correct = 0;
+      let firedCount = 0;
       const started = performance.now();
+
       for (const sample of samples) {
-        const out = deep(engine.evaluate('Metric', JSON.stringify(sample.fact), false));
-        if ((out.fired || []).includes('HighCpu') === sample.expect) correct++;
+        const res = deep(processor.process_event(JSON.stringify(sample)));
+        const fired = res.fired_rules || [];
+        if (fired.includes('HighCpuAlert')) {
+          firedCount++;
+          if (sample.expect) correct++;
+        } else {
+          if (!sample.expect) correct++;
+        }
       }
-      rows = [summarize('sequential_rule_engine', samples.length, correct, started)];
-      status = 'done — each input produced one isolated output';
+
+      const elapsedMs = performance.now() - started;
+      const eps = samples.length / (elapsedMs / 1000);
+
+      rows = [{
+        mode: `stream_processor (${windowType})`,
+        events: samples.length,
+        fired: firedCount,
+        accuracy: (correct / samples.length * 100).toFixed(2) + '%',
+        throughput: eps.toFixed(0) + ' rec/s',
+        elapsed: elapsedMs.toFixed(1) + ' ms'
+      }];
+
+      streamSummary = {
+        rule: streamGrl,
+        windowType,
+        windowMs: windowDurationMs,
+        totalEvents: samples.length,
+        alertsTriggered: firedCount
+      };
+
+      status = `done — ${samples.length} events processed in ${elapsedMs.toFixed(1)}ms (${eps.toFixed(0)} rec/s)`;
     } catch (e) {
       status = '';
       error = e.message;
@@ -86,35 +112,66 @@
 </script>
 
 <section>
-  <h3>Sequential records — browser WASM</h3>
+  <div class="head-row">
+    <h3>Stateful Event-Stream Engine — WASM & Windowing</h3>
+    <button class="primary" onclick={run} disabled={busy}>{busy ? 'processing…' : '▶ Run Stream'}</button>
+  </div>
   <p class="muted">
-    Feeds records sequentially through <code>RuleEngine</code>. Each input receives
-    one isolated output; this example does not provide windows or persistent state.
+    Processes real-time event streams through <code>WasmStreamProcessor</code> using 
+    <code>rust-rule-engine</code>'s native windowing (Sliding & Tumbling windows).
+    {#if status}<span class="status">— {status}</span>{/if}
   </p>
 
   <div class="controls">
-    <label>events<input type="number" min="100" max="50000" step="100" bind:value={events} /></label>
-    <label>high %<input type="number" min="0" max="100" bind:value={highPercent} /></label>
-    <button class="primary" onclick={run} disabled={busy}>{busy ? 'running…' : 'Run'}</button>
-    <span class="muted status">{status}</span>
+    <label>Events <input type="number" min="1000" max="50000" step="1000" bind:value={events} /></label>
+    <label>High % <input type="number" min="0" max="100" bind:value={highPercent} /></label>
+    <label>Window Type
+      <select bind:value={windowType}>
+        <option value="sliding">Sliding Window</option>
+        <option value="tumbling">Tumbling Window</option>
+        <option value="session">Session Window</option>
+      </select>
+    </label>
+    <label>Window Duration (ms) <input type="number" min="1000" max="60000" step="1000" bind:value={windowDurationMs} /></label>
   </div>
 
   {#if error}<div class="error">Error: {error}</div>{/if}
 
   {#if rows.length}
     <table>
-      <thead><tr><th>mode</th><th>accuracy</th><th>records/s</th><th>elapsed ms</th></tr></thead>
+      <thead>
+        <tr>
+          <th>Stream Mode</th>
+          <th>Total Events</th>
+          <th>Alerts Fired</th>
+          <th>Accuracy</th>
+          <th>Throughput</th>
+          <th>Elapsed Time</th>
+        </tr>
+      </thead>
       <tbody>
         {#each rows as r}
           <tr>
-            <td>{r.name}</td>
-            <td>{(r.accuracy * 100).toFixed(2)}%</td>
-            <td>{r.eps.toFixed(0)}</td>
-            <td>{r.elapsedMs.toFixed(1)}</td>
+            <td><code>{r.mode}</code></td>
+            <td>{r.events.toLocaleString()}</td>
+            <td><code>{r.fired}</code></td>
+            <td>{r.accuracy}</td>
+            <td><strong>{r.throughput}</strong></td>
+            <td>{r.elapsed}</td>
           </tr>
         {/each}
       </tbody>
     </table>
+  {/if}
+
+  {#if streamSummary}
+    <div class="summary-box">
+      <div class="summary-title">Stream Engine Execution Summary</div>
+      <div class="summary-detail">
+        Windowing Strategy: <code>{streamSummary.windowType}</code> ({streamSummary.windowMs}ms window) | Evaluated over {streamSummary.totalEvents.toLocaleString()} events
+      </div>
+      <pre class="grl-box">{streamSummary.rule}</pre>
+    </div>
   {/if}
 </section>
 
@@ -122,10 +179,19 @@
   section { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; padding: 14px; max-width: 760px; }
   h3 { margin: 0 0 4px; font-size: 14px; }
   .muted { font-size: 12px; }
-  .controls { display: flex; align-items: flex-end; gap: 10px; margin: 12px 0; flex-wrap: wrap; }
+  .head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .status { color: var(--fg-muted); }
+  .controls { display: flex; align-items: flex-end; gap: 12px; margin: 12px 0; flex-wrap: wrap; }
   label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--fg-muted); }
-  input { width: 110px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-  th, td { text-align: left; border-bottom: 1px solid var(--border); padding: 6px 4px; font-size: 12px; }
+  input, select { width: 120px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--fg); font-size: 12px; }
+  .primary { font-size: 12px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--green, #22c55e); color: #fff; font-weight: 600; cursor: pointer; }
+  .primary:hover:not(:disabled) { opacity: 0.9; }
+  .primary:disabled { opacity: 0.6; cursor: default; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  th, td { text-align: left; border-bottom: 1px solid var(--border); padding: 8px 6px; font-size: 12px; }
+  .summary-box { margin-top: 14px; padding: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }
+  .summary-title { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+  .summary-detail { font-size: 11.5px; color: var(--fg-muted); margin-bottom: 8px; }
+  .grl-box { font-size: 11px; margin: 0; padding: 8px; background: var(--bg-elev2, #1e1e1e); border-radius: 4px; overflow-x: auto; white-space: pre-wrap; }
   .error { color: var(--red); margin: 8px 0; }
 </style>

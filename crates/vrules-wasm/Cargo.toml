@@ -20,6 +20,7 @@ console_error_panic_hook = "=0.1.7"
 # The native GRL evaluator is reused so WASM and native share rule semantics.
 # No mcp-client is present because the browser has no stdio MCP transport.
 vrules-core = { path = "../vrules-core", default-features = false, features = ["rule-engine", "embeddings"] }
+vrules-canon = { path = "../vrules-canon" }
 # The Embedder trait (path-unified with vrules-core's em-log-n so the trait types match).
 em-log-n = { path = "../em-log-n", default-features = false }
 rust-rule-engine = { workspace = true }

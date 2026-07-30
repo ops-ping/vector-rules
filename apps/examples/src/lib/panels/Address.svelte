@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte';
   import init, { verify_address } from 'vrules-wasm/vrules_wasm.js';
   import wasmUrl from 'vrules-wasm/vrules_wasm_bg.wasm?url';
 
@@ -71,6 +72,8 @@
     textInput = defaults.text;
     structuredInput = defaults.structured;
   }
+
+  onMount(run);
 </script>
 
 <section>

@@ -1,18 +1,39 @@
 <script>
-  // Client-side backward chaining: the vrules-wasm `prove` runs the engine's
-  // goal-directed proof here in the browser — the same `vrules_core::prove` the native
-  // daemon runs, no server round-trip. Pose a goal against GRL knowledge rules and
-  // the engine works backward, reporting provability, missing facts, and the proof
-  // tree.
+  // Client-side backward chaining: vrules-wasm `prove` runs goal-directed
+  // backward chaining in the browser with no server round-trip.
+  import { onMount } from 'svelte';
   import init, { prove } from 'vrules-wasm/vrules_wasm.js';
   import wasmUrl from 'vrules-wasm/vrules_wasm_bg.wasm?url';
 
-  // A two-rule CHAIN: UpgradeRule depends on IsVIP, which VIPRule derives from
-  // LoyaltyPoints. Proving EligibleForUpgrade walks back through both rules —
-  // the proof tree shows the chain (EligibleForUpgrade ← IsVIP ← LoyaltyPoints).
-  let grl = $state('rule "VIPRule" {\n    when\n        User.LoyaltyPoints >= 1000\n    then\n        User.IsVIP = true;\n}\n\nrule "UpgradeRule" {\n    when\n        User.IsVIP == true\n    then\n        User.EligibleForUpgrade = true;\n}');
-  let query = $state('query "CheckUpgrade" {\n    goal: User.EligibleForUpgrade == true\n    strategy: depth-first\n    max-depth: 5\n}');
-  let factsText = $state('{ "User.LoyaltyPoints": 1200 }');
+  // Multi-tiered e-commerce approval flow: ApproveOrder depends on FundsAvailable & RiskIsLow
+  let grl = $state(`rule "CheckFunds" {
+    when
+        Order.Amount <= Account.Balance
+    then
+        Status.FundsAvailable = true;
+}
+
+rule "CheckRisk" {
+    when
+        Account.AgeDays > 30
+    then
+        Status.RiskIsLow = true;
+}
+
+rule "ApproveOrder" {
+    when
+        Status.FundsAvailable == true && Status.RiskIsLow == true
+    then
+        Order.Approved = true;
+}`);
+
+  let query = $state(`query "ProveOrderApproval" {
+    goal: Order.Approved == true
+    strategy: depth-first
+    max-depth: 5
+}`);
+
+  let factsText = $state('{ "Order.Amount": 50, "Account.Balance": 100, "Account.AgeDays": 45 }');
 
   let result = $state(null);
   let error = $state('');
@@ -25,7 +46,6 @@
     return initPromise;
   }
 
-  // serde-wasm-bindgen returns nested JS Maps; convert to plain objects for display.
   function deep(v) {
     if (v instanceof Map) { const o = {}; for (const [k, val] of v) o[k] = deep(val); return o; }
     if (Array.isArray(v)) return v.map(deep);
@@ -49,41 +69,41 @@
       busy = false;
     }
   }
+
+  onMount(run);
 </script>
 
 <section>
-  <h3>Backward-chaining <code>prove</code> — in the browser</h3>
+  <div class="head-row">
+    <h3>Backward-Chaining Proof Engine — Mathematical Verification</h3>
+    <button class="primary" onclick={run} disabled={busy}>{busy ? 'proving…' : '▶ Prove Goal'}</button>
+  </div>
   <p class="muted">
-    The wasm engine runs the same <code>vrules::prove</code> the daemon runs, here in your
-    browser. Pose a goal against GRL knowledge rules; the engine works backward and reports
-    provability, missing facts, and the proof tree. The example <b>chains two rules</b>:
-    <code>EligibleForUpgrade ← IsVIP ← LoyaltyPoints ≥ 1000</code> — the proof tree shows each
-    link.
+    Goal-directed backward chaining (`vrules::prove`). Proves whether a goal like <code>Order.Approved == true</code> 
+    is provable from a GRL knowledge base, producing an auditable proof tree or listing missing facts.
+    {#if status}<span class="status">— {status}</span>{/if}
   </p>
 
   <div class="cols">
-    <label class="col">GRL rules<textarea rows="7" bind:value={grl}></textarea></label>
-    <label class="col">query (goal)<textarea rows="7" bind:value={query}></textarea></label>
+    <label class="col">GRL Knowledge Base<textarea rows="8" bind:value={grl}></textarea></label>
+    <label class="col">Query Goal<textarea rows="8" bind:value={query}></textarea></label>
   </div>
-  <label>facts (JSON)<input bind:value={factsText} /></label>
-
-  <div class="controls">
-    <button class="primary" onclick={run} disabled={busy}>{busy ? 'proving…' : 'Prove'}</button>
-    <span class="muted status">{status}</span>
-  </div>
+  <label>Working Facts (JSON)<input bind:value={factsText} /></label>
 
   {#if error}<div class="error">Error: {error}</div>{/if}
 
   {#if result}
     <div class="out">
       <div class="row">
-        <span class="pill {result.provable ? 'hit' : 'miss'}">{result.provable ? 'PROVABLE ✓' : 'not provable'}</span>
-        {#if result.missing_facts?.length}<span class="muted">missing: <code>{result.missing_facts.join(', ')}</code></span>{/if}
+        <span class="pill {result.provable ? 'hit' : 'miss'}">{result.provable ? 'PROVABLE ✓' : 'NOT PROVABLE ✗'}</span>
+        {#if result.missing_facts?.length}
+          <span class="muted">Missing Facts: <code>{result.missing_facts.join(', ')}</code></span>
+        {/if}
       </div>
       {#if result.bindings && Object.keys(result.bindings).length}
-        <div class="row"><span class="muted">bindings</span><span class="mono">{JSON.stringify(result.bindings)}</span></div>
+        <div class="row"><span class="muted">Bindings:</span> <span class="mono">{JSON.stringify(result.bindings)}</span></div>
       {/if}
-      <div class="label">proof tree</div>
+      <div class="label">Mathematical Proof Tree</div>
       <pre class="detail">{JSON.stringify(result.proof, null, 2)}</pre>
     </div>
   {/if}
@@ -92,22 +112,25 @@
 <style>
   section { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; padding: 14px; max-width: 860px; }
   h3 { margin: 0 0 4px; font-size: 14px; }
-  .muted { font-size: 12px; }
+  .muted { font-size: 12px; color: var(--fg-muted); }
+  .head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
   .cols { display: flex; gap: 12px; margin: 10px 0; flex-wrap: wrap; }
   .col { flex: 1; min-width: 240px; }
   label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--fg-muted); margin: 6px 0; }
-  textarea, input { font-family: var(--mono, monospace); font-size: 12px; }
-  .controls { display: flex; align-items: center; gap: 10px; margin: 10px 0; flex-wrap: wrap; }
-  .status { margin-left: 4px; }
+  textarea, input { font-family: var(--mono, monospace); font-size: 11.5px; background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; }
+  .status { color: var(--fg-muted); }
+  .primary { font-size: 12px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--green, #22c55e); color: #fff; font-weight: 600; cursor: pointer; }
+  .primary:hover:not(:disabled) { opacity: 0.9; }
+  .primary:disabled { opacity: 0.6; cursor: default; }
   .out { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
   .row { display: flex; align-items: center; gap: 10px; margin: 6px 0; flex-wrap: wrap; }
-  .label { font-size: 11px; text-transform: uppercase; color: var(--fg-muted); margin: 10px 0 4px; }
-  .pill.hit { color: var(--green); }
-  .pill.miss { color: var(--fg-muted); }
+  .label { font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--fg-muted); margin: 10px 0 4px; }
+  .pill.hit { color: var(--green, #22c55e); font-weight: 700; font-size: 13px; }
+  .pill.miss { color: var(--red, #ef4444); font-weight: 700; font-size: 13px; }
   .mono { font-family: var(--mono, monospace); font-size: 12px; }
   .detail {
     background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
-    padding: 10px 12px; font-size: 11.5px; white-space: pre-wrap; overflow-x: auto;
+    padding: 10px 12px; font-size: 11px; white-space: pre-wrap; overflow-x: auto; max-height: 380px;
   }
   .error { color: var(--red); margin: 8px 0; }
 </style>

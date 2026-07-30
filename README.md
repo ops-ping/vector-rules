@@ -45,9 +45,9 @@ rule "HoldHighRiskRequest" salience 100 no-loop {
 
 ### Execution Trace
 
-The following execution trace demonstrates how semantic meaning is turned into governed policy:
+The following execution trace demonstrates how inline vector algebra `(king − man + woman) ≈ queen` and semantic reasoning are evaluated in real-time by the browser rule engine:
 
-![Semantic similarity over EmbeddingGemma vectors with a forward-chaining trace, running locally in the browser](docs/examples-semantic.png)
+![Semantic vector algebra and similarity over EmbeddingGemma vectors running locally in the browser](docs/examples-semantic.png)
 
 ---
 
@@ -117,7 +117,31 @@ The built-in vector surface is:
 | `s_depth(text, region)` | Measures graded depth in a named region fitted around an exemplar cloud (`1.0` at the fitted boundary; smaller is deeper inside). | Raw region evidence; assign it to a fact in `then`. |
 | `b_member(text, region)` | Tests the same fitted region at its coverage threshold. | Boolean; test it directly in `when`. |
 
-Pairwise functions accept fact values or literal text. Artifact-backed functions refer to a stable policy concept by name: an axis represents a semantic direction such as routine-to-urgent, while a region represents a cluster such as known business-email-compromise phrasing. The bridge canonicalizes every text argument before embedding it.
+Pairwise functions accept fact values, literal text, or nested Lisp-style vector algebra arrays. Artifact-backed functions refer to a stable policy concept by name: an axis represents a semantic direction such as routine-to-urgent, while a region represents a cluster such as known business-email-compromise phrasing. The bridge canonicalizes every text argument before embedding it.
+
+### Inline Vector Algebra (Lisp-Style ASTs)
+
+In addition to string arguments, vector functions like `s_cosine` and `s_dot` accept inline Lisp-style vector algebra expressions. This allows rules to perform complex vector arithmetic (such as vector addition, subtraction, or scaling) directly inside rule conditions:
+
+* **Operators:** `["v:add", A, B]`, `["v:sub", A, B]`, `["v:scale", A, scalar]`, `["v:mul", A, B]`.
+* **Implicit Embedding:** Raw text strings inside vector operations (e.g., `"king"`, `"man"`, `"woman"`) or string fact references are implicitly converted to embedding vectors.
+* **Classic Analogy Example:** Evaluate `(king − man + woman) ≈ queen` natively in GRL:
+
+```grl
+rule "EvaluateVectorAnalogy" no-loop {
+    when
+        Concept.target != ""
+    then
+        Concept.similarity = s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], Concept.target);
+}
+
+rule "AnalogyMatch" no-loop {
+    when
+        Concept.similarity > 0.80
+    then
+        Decision.is_analogy_target = true;
+}
+```
 
 Axes, calibration windows, and regions are **named artifacts** fitted offline (or in the browser) from exemplar sets. Each artifact records its provenance—model, dimension, task prefix, exemplar-set version—and registration validates that provenance against the active embedder, so an axis fitted against one model can never silently score vectors from another.
 

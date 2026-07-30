@@ -139,9 +139,6 @@ rule "RecordEvidence" salience 10 no-loop {
         await inject(eng, t);
       }
       status = 'fitting axis, calibration window, and region…';
-      // Constructor tier, in the browser: axis = normalized difference of
-      // exemplar centroids; percentile window from routine/neutral texts;
-      // low-rank ellipsoid region over the urgent cloud.
       eng.fit_axis(
         'urgency_pressure_v1',
         JSON.stringify(URGENT_EXEMPLARS),
@@ -217,18 +214,14 @@ rule "RecordEvidence" salience 10 no-loop {
 
 <section>
   <div class="head-row">
-    <h3>Fraud triage — geometry + rules, in the browser</h3>
+    <h3>Layered Fusion: AI Vector Geometry + Deterministic Rules</h3>
     <button class="rerun" onclick={triage} disabled={busy || !ready}>
       {busy ? 'working…' : '↻ Triage'}
     </button>
   </div>
   <p class="muted">
-    A payment-request screen in the layered-fusion shape production fraud stacks use: the
-    embedding layer supplies <em>named, versioned geometry</em> (an urgency-pressure axis with a
-    percentile calibration window, and a BEC-phrasing region fitted from exemplars), and the
-    symbolic rules make the decision — vector scores are evidence beside hard checks
-    (new payee, amount), never a standalone gate. Every artifact carries model provenance and is
-    validated against the active embedder at load.
+    Fuses <em>probabilistic vector geometry</em> (fitted urgency axis & BEC phrasing region) with 
+    <em>deterministic policy gates</em> (new payee check, amount threshold).
     {#if status}<span class="status">— {status}</span>{/if}
   </p>
 
@@ -240,57 +233,58 @@ rule "RecordEvidence" salience 10 no-loop {
     {/each}
   </div>
 
-  <div class="form">
-    <label class="field">
-      <span>Payment request text</span>
-      <textarea rows="3" bind:value={text}></textarea>
-    </label>
-    <div class="row">
-      <label class="check"><input type="checkbox" bind:checked={newPayee} /> new payee</label>
-      <label class="field amount">
-        <span>amount</span>
-        <input type="number" bind:value={amount} min="0" step="100" />
+  <div class="split-view">
+    <div class="form-col">
+      <label class="field">
+        <span>Payment Request Input</span>
+        <textarea rows="3" bind:value={text}></textarea>
       </label>
+      <div class="row">
+        <label class="check"><input type="checkbox" bind:checked={newPayee} /> new payee</label>
+        <label class="field amount">
+          <span>amount ($)</span>
+          <input type="number" bind:value={amount} min="0" step="100" />
+        </label>
+      </div>
+
+      {#if outcome}
+        <div class="decision" class:hold={outcome.action === 'hold'}>
+          <div class="action">{outcome.action === 'hold' ? '⛔ HOLD REQUEST' : '✓ APPROVE REQUEST'}</div>
+          <div class="reason">{outcome.reason}</div>
+          <div class="evidence">
+            {#if outcome.urgency !== null}
+              <span>Urgency Percentile: <code>{outcome.urgency.toFixed(1)}%</code> <span class="muted">(hold if ≥ 90.0% + new payee + ≥ $10,000)</span></span>
+            {/if}
+            {#if outcome.depth !== null}
+              <span>BEC Region Depth: <code>{outcome.depth.toFixed(2)}</code> <span class="muted">(≤ 1.0 is inside fitted BEC cluster)</span></span>
+            {/if}
+          </div>
+          <div class="fired muted">Rules Fired: {outcome.fired.length ? outcome.fired.join(', ') : '(no rules)'}</div>
+        </div>
+      {/if}
+    </div>
+
+    <div class="rules-col">
+      <div class="col-title">Active GRL Policy (Layered Fusion)</div>
+      <pre class="grl-display">{TRIAGE_RULES}</pre>
     </div>
   </div>
 
-  {#if outcome}
-    <div class="decision" class:hold={outcome.action === 'hold'}>
-      <div class="action">{outcome.action === 'hold' ? '⛔ HOLD' : '✓ APPROVE'}</div>
-      <div class="reason">{outcome.reason}</div>
-      <div class="evidence">
-        {#if outcome.urgency !== null}
-          <span>urgency-pressure percentile: <code>{outcome.urgency.toFixed(1)}</code> <span class="muted">(hold ≥ 90 with new payee + amount)</span></span>
-        {/if}
-        {#if outcome.depth !== null}
-          <span>BEC-region depth: <code>{outcome.depth.toFixed(2)}</code> <span class="muted">(≤ 1.0 is inside the fitted region)</span></span>
-        {/if}
-      </div>
-      <div class="fired muted">fired: {outcome.fired.length ? outcome.fired.join(', ') : '(no rules)'}</div>
-    </div>
-  {/if}
-
   {#if provenance}
     <div class="prov">
-      <span class="muted">artifacts:</span>
+      <span class="muted">Fitted Geometry Artifacts:</span>
       {#each provenance.names as n}<code class="tag">{n}</code>{/each}
       {#if provenance.axis}
         <span class="muted">
-          fitted against <code>{provenance.axis.model}</code> dim <code>{provenance.axis.dim}</code> —
-          a different model or dimension is rejected at load.
+          (Validated against <code>{provenance.axis.model}</code> dim <code>{provenance.axis.dim}</code>)
         </span>
       {/if}
     </div>
   {/if}
-
-  <details class="rules">
-    <summary>GRL pack (shared-rules/fraud/triage.grl)</summary>
-    <pre>{TRIAGE_RULES}</pre>
-  </details>
 </section>
 
 <style>
-  section { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; padding: 14px; max-width: 720px; }
+  section { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; padding: 14px; max-width: 860px; }
   h3 { margin: 0 0 4px; font-size: 14px; }
   .muted { font-size: 12px; color: var(--fg-muted); }
   .head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
@@ -302,32 +296,34 @@ rule "RecordEvidence" salience 10 no-loop {
   .rerun:disabled, .preset:disabled { opacity: 0.6; cursor: default; }
   .status { color: var(--fg-muted); }
   .presets { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 8px; }
-  .form { display: grid; gap: 8px; }
+  .split-view { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+  @media (max-width: 680px) { .split-view { grid-template-columns: 1fr; } }
+  .form-col, .rules-col { display: flex; flex-direction: column; gap: 8px; }
+  .col-title { font-size: 12px; font-weight: 600; color: var(--fg-muted); }
   .field { display: grid; gap: 4px; font-size: 12px; color: var(--fg-muted); }
   .field textarea, .field input {
     background: var(--bg); color: var(--fg); border: 1px solid var(--border);
-    border-radius: 6px; padding: 8px 10px; font-size: 12.5px; font-family: inherit;
+    border-radius: 6px; padding: 8px 10px; font-size: 12px; font-family: inherit;
   }
   .row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
-  .check { font-size: 12.5px; display: flex; gap: 6px; align-items: center; }
-  .amount input { width: 120px; }
+  .check { font-size: 12px; display: flex; gap: 6px; align-items: center; }
+  .amount input { width: 110px; }
   .decision {
-    margin-top: 12px; border: 1px solid var(--border); border-left: 3px solid var(--green);
-    border-radius: 6px; padding: 12px 14px;
+    border: 1px solid var(--border); border-left: 3px solid var(--green);
+    border-radius: 6px; padding: 10px 12px;
   }
   .decision.hold { border-left-color: var(--red); }
-  .action { font-weight: 700; font-size: 14px; }
+  .action { font-weight: 700; font-size: 13px; }
   .decision.hold .action { color: var(--red); }
   .decision:not(.hold) .action { color: var(--green); }
-  .reason { font-size: 12.5px; margin: 4px 0 8px; }
-  .evidence { display: grid; gap: 3px; font-size: 12px; }
-  .fired { margin-top: 8px; font-size: 11px; }
-  .prov { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; align-items: baseline; font-size: 12px; }
+  .reason { font-size: 12px; margin: 4px 0 6px; }
+  .evidence { display: grid; gap: 3px; font-size: 11.5px; }
+  .fired { margin-top: 6px; font-size: 11px; }
+  .prov { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; align-items: baseline; font-size: 11.5px; }
   .prov .tag { border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; }
-  .rules { margin-top: 12px; font-size: 12px; }
-  .rules pre {
-    margin-top: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
-    padding: 10px 12px; font-size: 11.5px; white-space: pre-wrap; overflow-x: auto;
+  .grl-display {
+    margin: 0; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 12px; font-size: 11px; white-space: pre-wrap; height: 100%; overflow-y: auto;
   }
   .error { color: var(--red); margin: 8px 0; }
 </style>

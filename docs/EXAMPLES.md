@@ -24,13 +24,7 @@ evidence, fired rules, and the parsed components.
 
 ## Semantic rules
 
-GRL vector functions evaluate over real EmbeddingGemma vectors. Function names
-carry their return kind — `s_` raw scalar (a measurement, never thresholded),
-`c_` calibrated (thresholdable), `b_` boolean, `m_` metadata — and the engine's
-load-time lint rejects thresholding a raw score directly. A measurement rule
-writes `s_cosine(word, "royalty")` into a fact; a decision rule thresholds the
-fact; and forward chaining carries a contrast measurement through a derived
-category into a final decision.
+GRL vector functions evaluate over real EmbeddingGemma vectors with Lisp-style vector algebra syntax sugar (e.g., `v:add`, `v:sub`). Function names carry their return kind — `s_` raw scalar (a measurement, never thresholded), `c_` calibrated (thresholdable), `b_` boolean, `m_` metadata — and the engine's load-time lint rejects thresholding a raw score directly. A measurement rule writes `s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], target)` into a fact; a decision rule thresholds the fact; and forward chaining carries a contrast measurement through a derived category into a final decision.
 
 ![Semantic similarity scores over EmbeddingGemma vectors, with a forward-chaining trace from measurement to decision](examples-semantic.png)
 
@@ -48,17 +42,12 @@ the active embedder at load.
 
 ## Streaming
 
-Records feed sequentially through the `RuleEngine`; each input produces one
-isolated output. The run reports throughput and accuracy for the sequential
-rule-engine path.
+Real-time event stream processing through `WasmStreamProcessor` using native sliding, tumbling, and session windowing in the browser. Each stream event is evaluated against windowed GRL rules with live throughput and accuracy metrics.
 
-![Sequential records processed through the browser rule engine with throughput and accuracy](examples-streaming.png)
+![Real-time event stream processing in the browser using WasmStreamProcessor and windowing](examples-streaming.png)
 
 ## Proof
 
-Backward-chaining `vrules::prove` runs in the browser — the same engine path the
-daemon runs. A goal is posed against a GRL knowledge base and the engine works
-backward, reporting provability, missing facts, and the proof tree. The example
-chains two rules: `EligibleForUpgrade ← IsVIP ← LoyaltyPoints ≥ 1000`.
+Backward-chaining `vrules::prove` runs in the browser — the same engine path the daemon runs. A goal is posed against a GRL knowledge base and the engine works backward, reporting provability, missing facts, and the mathematical proof tree. The example proves a multi-tiered e-commerce order approval chain (`Order.Approved ← Status.FundsAvailable AND Status.RiskIsLow`).
 
-![Backward-chaining proof reporting provability and a proof tree for a two-rule chain](examples-proof.png)
+![Backward-chaining proof tree reporting provability and mathematical derivation for order approval](examples-proof.png)
