@@ -5,12 +5,75 @@ import puppeteer from 'puppeteer';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../../..');
-const outputPath = resolve(repoRoot, 'docs/examples-semantic.png');
+
+const targets = [
+  {
+    id: 'address',
+    route: '#/address',
+    output: resolve(repoRoot, 'docs/examples-address.png'),
+    viewport: { width: 1200, height: 950 },
+    prepare: async (page) => {
+      await page.waitForSelector('.pill', { timeout: 30000 });
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+  },
+  {
+    id: 'semantic',
+    route: '#/semantic',
+    output: resolve(repoRoot, 'docs/examples-semantic.png'),
+    viewport: { width: 1200, height: 1300 },
+    prepare: async (page) => {
+      await page.waitForSelector('.chain', { timeout: 30000 });
+      await page.waitForSelector('.status', { timeout: 30000 });
+
+      // Expand the first row ('queen') to show its rule & evaluated vector algebra expression
+      const vrow = await page.$('.vrow');
+      if (vrow) await vrow.click();
+
+      // Expand the forward chain element to show the 3-step rules and trace
+      const chain = await page.$('.chain');
+      if (chain) await chain.click();
+
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  },
+  {
+    id: 'fraud',
+    route: '#/fraud',
+    output: resolve(repoRoot, 'docs/examples-fraud-triage.png'),
+    viewport: { width: 1200, height: 950 },
+    prepare: async (page) => {
+      await page.waitForSelector('.decision', { timeout: 30000 });
+      await page.waitForSelector('.prov', { timeout: 30000 });
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+  },
+  {
+    id: 'streaming',
+    route: '#/streaming',
+    output: resolve(repoRoot, 'docs/examples-streaming.png'),
+    viewport: { width: 1200, height: 950 },
+    prepare: async (page) => {
+      await page.waitForSelector('button.primary', { timeout: 30000 });
+      await page.click('button.primary');
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  },
+  {
+    id: 'prove',
+    route: '#/prove',
+    output: resolve(repoRoot, 'docs/examples-proof.png'),
+    viewport: { width: 1200, height: 950 },
+    prepare: async (page) => {
+      await page.waitForSelector('.out', { timeout: 30000 });
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
+];
 
 async function main() {
-  console.log('Launching headless browser to capture documentation screenshot...');
+  console.log('Launching headless browser to capture all example screenshots...');
 
-  // Use system chrome if available, otherwise puppeteer's bundled browser
   const chromePath = '/usr/bin/google-chrome';
   const launchOptions = {
     headless: 'new',
@@ -22,50 +85,42 @@ async function main() {
 
   const browser = await puppeteer.launch(launchOptions);
   try {
-    const page = await browser.newPage();
-    await page.setViewport({ width: 1200, height: 1300, deviceScaleFactor: 2 });
+    for (const t of targets) {
+      console.log(`\n--- Capturing ${t.id} (${t.route}) ---`);
+      const page = await browser.newPage();
+      page.on('console', (msg) => console.log('  PAGE LOG:', msg.text()));
+      page.on('pageerror', (err) => console.error('  PAGE ERROR:', err));
 
-    const targetUrl = 'http://localhost:5173/#/semantic';
-    console.log(`Navigating to ${targetUrl}...`);
-    await page.goto(targetUrl, { waitUntil: 'networkidle0' });
+      await page.setViewport({ width: t.viewport.width, height: t.viewport.height, deviceScaleFactor: 2 });
 
-    // Wait for the WASM evaluation to finish (indicated by the .status or .chain element)
-    console.log('Waiting for WebAssembly vector engine evaluations...');
-    await page.waitForSelector('.chain', { timeout: 30000 });
-    await page.waitForSelector('.status', { timeout: 30000 });
+      const url = `http://localhost:5173/${t.route}`;
+      console.log(`Navigating to ${url}...`);
+      await page.goto(url, { waitUntil: 'networkidle0' });
 
-    // Expand the first row ('queen') to show its rule & evaluated vector algebra expression
-    console.log('Expanding row details...');
-    const vrow = await page.$('.vrow');
-    if (vrow) await vrow.click();
+      console.log(`Preparing UI state for ${t.id}...`);
+      await t.prepare(page);
 
-    // Expand the forward chain element to show the 3-step rules and trace
-    console.log('Expanding forward chain details...');
-    const chain = await page.$('.chain');
-    if (chain) await chain.click();
+      const section = await page.$('main section.stage');
+      if (!section) {
+        throw new Error(`Could not find main section.stage for ${t.id}`);
+      }
 
-    // Wait a brief moment for layout/fonts and state transitions
-    await new Promise((r) => setTimeout(r, 1000));
+      console.log(`Saving screenshot to ${t.output}...`);
+      await section.screenshot({
+        path: t.output,
+        type: 'png'
+      });
 
-    // Capture the semantic example stage container
-    const section = await page.$('main section.stage');
-    if (!section) {
-      throw new Error('Could not find main section.stage container');
+      await page.close();
     }
 
-    console.log(`Saving screenshot to ${outputPath}...`);
-    await section.screenshot({
-      path: outputPath,
-      type: 'png'
-    });
-
-    console.log('Screenshot captured successfully!');
+    console.log('\nAll screenshots captured successfully!');
   } finally {
     await browser.close();
   }
 }
 
 main().catch((err) => {
-  console.error('Error capturing screenshot:', err);
+  console.error('Error capturing screenshots:', err);
   process.exit(1);
 });

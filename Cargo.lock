@@ -3652,7 +3652,7 @@ dependencies = [
 [[package]]
 name = "rust-rule-engine"
 version = "1.20.3"
-source = "git+https://github.com/ops-ping/rust-rule-engine.git?branch=main#f7c5968016a08e3bc45828d93ed3aadccf7e5fdc"
+source = "git+https://github.com/ops-ping/rust-rule-engine.git?branch=main#cfddfcdead2b6cdb1188188dc5b47f3b153d7b84"
 dependencies = [
  "aho-corasick",
  "chrono",
@@ -4163,7 +4163,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
