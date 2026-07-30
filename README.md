@@ -1,12 +1,12 @@
 # vector-rules
 
-**Reason like an AI without sacrificing determinism.**
+**A universal semantic execution framework providing best-in-class AI guardrules.**
 
 `vector-rules` bridges meaning embedded in any media seamlessly across GitOps-managed policy requirements with mathematical precision rather than prompts.
 
-**Turn meaning** found in documents, messages, events, and records into deterministic, governed decisions. This framework combines embeddings, which measure semantic relationships in content, with a rules engine that applies explicit organizational policy to those measurements alongside ordinary application facts.
+`vector-rules` is a **universal semantic execution framework**. Rather than treating vector embeddings as passive data for simple retrieval, it elevates vector math to a first-class execution primitive evaluated directly inside a deterministic, stateful Rete rules engine. Built on WebAssembly and WASI, the exact same semantic execution kernel runs in Rust backends, web browsers via WebGPU/IndexedDB, and distributed cloud caches.
 
-LLMs are excellent at interpreting language, generating candidates, and summarizing complex information, **but they are not a reviewable or auditable source of production policy.** When an LLM makes an operational decision, asking it "why?" yields a hallucinated rationalization rather than a verifiable explanation. By inserting a deterministic, GitOps-managed rule layer between fuzzy inputs and operational actions, `vector-rules` ensures your AI-driven behavior can be tested, traced, audited, replayed, and rolled back.
+It provides best-in-class **AI Guardrules**. Standard AI "guardrails" rely on fuzzy LLMs to evaluate other LLMs—a slow process prone to prompt drift and hallucination. `vector-rules` enforces strict *guardrules*: deterministic, mathematically provable policy-as-code applied directly to fuzzy semantic evidence alongside ordinary application facts. When an AI guardrule blocks or routes an action, it doesn't offer a hallucinated summary; it yields a verifiable, backward-chained mathematical proof tree tied to the exact Git revision of your ruleset.
 
 The project is fully open source, vendor-neutral, local-first, and embeddable. The same rule semantics can govern an MCP component host, run inside a Rust application, evaluate stateful streams, and power browser-side what-if analysis through WebAssembly. Organizations keep their policy in Git and can move it across models, clients, and deployment environments without depending on a proprietary control plane.
 

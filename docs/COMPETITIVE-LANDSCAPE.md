@@ -7,16 +7,14 @@ competition without drifting into platform-marketing language.
 
 ## Positioning in one sentence
 
-**vector-rules is a fully open-source, vendor-neutral framework for deterministic
-LLM/agent governance, MCP mediation, organizational memory, and policy-as-code
-workflows.**
+**vector-rules is a universal semantic execution framework providing best-in-class AI guardrules, MCP mediation, organizational memory, and policy-as-code workflows.**
 
 That means:
 
-- vector-rules is **not** a closed hosted platform
-- vector-rules is **not** a vendor-specific orchestration surface
-- vector-rules is aimed at organizations that want these capabilities without accepting
-  long-term platform lock-in
+- vector-rules is **not** a passive vector database or simple RAG retrieval store; it executes semantic logic natively.
+- vector-rules is **not** a fuzzy, prompt-based "guardrail"; it enforces strict, mathematically provable AI *guardrules*.
+- vector-rules is **not** a closed hosted platform or vendor-specific orchestration surface.
+- vector-rules is aimed at organizations that want these capabilities without accepting long-term platform lock-in.
 
 ## Vision
 

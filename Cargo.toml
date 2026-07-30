@@ -19,6 +19,8 @@ rust-version = "1.94"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/ops-ping/vector-rules"
 authors = ["ops-ping <241499582+ops-ping@users.noreply.github.com>"]
+description = "A universal semantic execution framework providing best-in-class AI guardrules."
+keywords = ["ai", "guardrules", "semantic", "mcp", "rete"]
 
 # All third-party versions are pinned with `=` per the workspace convention.
 [workspace.dependencies]
