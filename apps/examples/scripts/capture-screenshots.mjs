@@ -23,7 +23,7 @@ async function main() {
   const browser = await puppeteer.launch(launchOptions);
   try {
     const page = await browser.newPage();
-    await page.setViewport({ width: 1200, height: 950, deviceScaleFactor: 2 });
+    await page.setViewport({ width: 1200, height: 1300, deviceScaleFactor: 2 });
 
     const targetUrl = 'http://localhost:5173/#/semantic';
     console.log(`Navigating to ${targetUrl}...`);
@@ -34,7 +34,17 @@ async function main() {
     await page.waitForSelector('.chain', { timeout: 30000 });
     await page.waitForSelector('.status', { timeout: 30000 });
 
-    // Wait a brief moment for layout/fonts
+    // Expand the first row ('queen') to show its rule & evaluated vector algebra expression
+    console.log('Expanding row details...');
+    const vrow = await page.$('.vrow');
+    if (vrow) await vrow.click();
+
+    // Expand the forward chain element to show the 3-step rules and trace
+    console.log('Expanding forward chain details...');
+    const chain = await page.$('.chain');
+    if (chain) await chain.click();
+
+    // Wait a brief moment for layout/fonts and state transitions
     await new Promise((r) => setTimeout(r, 1000));
 
     // Capture the semantic example stage container
