@@ -70,6 +70,18 @@ jobs:
           fi
           echo "site size: $(du -sh dist | cut -f1)"
 
+      - name: Verify the seeded vector cache shipped
+        working-directory: apps/examples
+        # Without these the site still works, but every visitor downloads the
+        # model before the first result. A cache-less artifact is a failure.
+        run: |
+          count=$(find dist/vrules-rest -type f 2>/dev/null | wc -l)
+          if [ "$count" -eq 0 ]; then
+            echo "no seeded vectors in dist/; demos would require a model download" >&2
+            exit 1
+          fi
+          echo "seeded vectors: $count"
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: apps/examples/dist

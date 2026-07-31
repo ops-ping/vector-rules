@@ -7,9 +7,11 @@
 //
 //   public/vrules-rest/v1/embeddings/<model>/<canon>/<hash>
 //
-// Vite copies `public/` into `dist/`, so `deploy.sh` uploads these to the bucket.
-// A cache hit lets an example run WITHOUT downloading the 226 MB model; a miss
-// (any text not seeded, e.g. free-form input) falls back to in-browser compute.
+// Vite copies `public/` into `dist/`, so these vectors ship with the static
+// site and are committed for that reason: the Pages build has no model or
+// inference engine and cannot regenerate them. A cache hit lets an example run
+// WITHOUT downloading the 226 MB model; a miss (any text not seeded, e.g.
+// free-form input) falls back to in-browser compute.
 //
 // Usage: node scripts/seed-cache.mjs
 //   env MODEL_GGUF   path to the Q4_K_M gguf (default: the vrules models dir)
