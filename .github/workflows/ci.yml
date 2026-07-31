@@ -3,10 +3,26 @@ name: CI
 on:
   push:
     branches: [main]
+    # Documentation-only changes cannot affect the build or tests: no crate
+    # embeds markdown via include_str!, and no test reads docs/.
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "LICENSE-*"
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "LICENSE-*"
 
 env:
   CARGO_TERM_COLOR: always
+
+# Supersede in-flight PR runs when new commits land; never cancel a main run,
+# whose cache save later runs depend on.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
@@ -22,7 +38,11 @@ jobs:
           targets: wasm32-unknown-unknown,wasm32-wasip2
 
       # Shared build/artifact caching (community convention; replaces hand-rolled actions/cache).
+      # Only main writes the cache: PR runs restore it but skip the save step and
+      # cannot evict main's entry.
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Format
         run: cargo fmt --all -- --check
@@ -55,14 +75,6 @@ jobs:
             -p vrules-gcp \
             -p vrules-cache
 
-      - name: Install wasm-pack
-        run: cargo install wasm-pack --locked
-
-      - name: Build wasm packages (web target)
-        run: |
-          wasm-pack build crates/vrules-wasm --target web --out-name vrules_wasm --release
-          wasm-pack build crates/em-log-n-wasm --target web --out-name em_log_n_wasm --release
-
       - name: Test (cached real-embedding conformance)
         # The committed fixture contains real EmbeddingGemma vectors and is reseeded
         # through vrules-shim --daemon, so CI remains model-free without stubs.
@@ -76,6 +88,29 @@ jobs:
           -p vrules-wasm
           -p vrules-shim
           -p vrules-cache
+
+  wasm:
+    name: browser wasm packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.0"
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked
+
+      - name: Build wasm packages (web target)
+        run: |
+          wasm-pack build crates/vrules-wasm --target web --out-name vrules_wasm --release
+          wasm-pack build crates/em-log-n-wasm --target web --out-name em_log_n_wasm --release
 
   deny:
     name: cargo-deny (advisory)
