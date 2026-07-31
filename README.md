@@ -1,14 +1,16 @@
 # vector-rules
 
-**A universal semantic execution framework providing best-in-class AI guardrules.**
+**A semantic execution substrate: vector math as a first-class operand inside a deterministic rules engine.**
 
-`vector-rules` bridges meaning embedded in any media seamlessly across GitOps-managed policy requirements with mathematical precision rather than prompts.
+Most AI systems make the model the judge and leave code as the tool it calls. `vector-rules` turns that around. The model becomes an instrument that supplies measurements, and deterministic, Git-governed rules make the decision — and prove how they reached it. Because the kernel is WebAssembly and WASI, that same semantic reasoning runs unchanged in a browser tab, a Rust backend, and a distributed cloud cache: any modern application surface, rather than a hosted control plane.
 
-`vector-rules` is a **universal semantic execution framework**. Rather than treating vector embeddings as passive data for simple retrieval, it elevates vector math to a first-class execution primitive evaluated directly inside a deterministic, stateful Rete rules engine. Built on WebAssembly and WASI, the exact same semantic execution kernel runs in Rust backends, web browsers via WebGPU/IndexedDB, and distributed cloud caches.
+Embeddings are ordinarily passive data behind a retrieval call. Here they are operands. Functions such as `s_contrast`, `c_project`, and `b_member` evaluate directly inside rule conditions, next to hard scalar facts like payment amount or payee status, in a stateful Rete engine. The embedder is pluggable at both levels — any WASI component implementing the `embedding` interface, running any compatible GGUF model — and every artifact records the model, revision, and dimension that produced it, so a swapped embedder can never silently score vectors from a foreign space.
 
-It provides best-in-class **AI Guardrules**. Standard AI "guardrails" rely on fuzzy LLMs to evaluate other LLMs—a slow process prone to prompt drift and hallucination. `vector-rules` enforces strict *guardrules*: deterministic, mathematically provable policy-as-code applied directly to fuzzy semantic evidence alongside ordinary application facts. When an AI guardrule blocks or routes an action, it doesn't offer a hallucinated summary; it yields a verifiable, backward-chained mathematical proof tree tied to the exact Git revision of your ruleset.
+**AI guardrules** are the flagship application. Standard AI "guardrails" rely on fuzzy LLMs to evaluate other LLMs — a slow process prone to prompt drift and hallucination. `vector-rules` enforces strict *guardrules* instead: deterministic, mathematically provable policy-as-code applied directly to fuzzy semantic evidence alongside ordinary application facts. When a guardrule blocks or routes an action, it doesn't offer a hallucinated summary; it yields a verifiable, backward-chained proof tree tied to the exact Git revision of your ruleset. MCP tool mediation, web grounding, and governed organizational memory are that same substrate under different rulesets, not separate products.
 
-The project is fully open source, vendor-neutral, local-first, and embeddable. The same rule semantics can govern an MCP component host, run inside a Rust application, evaluate stateful streams, and power browser-side what-if analysis through WebAssembly. Organizations keep their policy in Git and can move it across models, clients, and deployment environments without depending on a proprietary control plane.
+The class this occupies is otherwise empty: policy DSLs are deterministic but semantically blind, semantic routers measure meaning but decide nothing, AI gateways mediate traffic without reasoning about it, and classic Rete engines have no notion of a vector. The [competitive landscape](docs/COMPETITIVE-LANDSCAPE.md) works through each of them in detail.
+
+The project is fully open source, vendor-neutral, local-first, and embeddable. Organizations keep their policy in Git and can move it across models, clients, and deployment environments without depending on a proprietary control plane.
 
 ---
 
