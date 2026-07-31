@@ -2,6 +2,8 @@
 
 **A semantic execution substrate: vector math as a first-class operand inside a deterministic rules engine.**
 
+**[▶ Try it in your browser](https://ops-ping.github.io/vector-rules/)** — the rule engine and the embedding model are both WebAssembly, so the demos run with no install and no server.
+
 Most AI systems make the model the judge and leave code as the tool it calls. `vector-rules` turns that around. The model becomes an instrument that supplies measurements, and deterministic, Git-governed rules make the decision — and prove how they reached it. Because the kernel is WebAssembly and WASI, that same semantic reasoning runs unchanged in a browser tab, a Rust backend, and a distributed cloud cache: any modern application surface, rather than a hosted control plane.
 
 Embeddings are ordinarily passive data behind a retrieval call. Here they are operands. Functions such as `s_contrast`, `c_project`, and `b_member` evaluate directly inside rule conditions, next to hard scalar facts like payment amount or payee status, in a stateful Rete engine. The embedder is pluggable at both levels — any WASI component implementing the `embedding` interface, running any compatible GGUF model — and every artifact records the model, revision, and dimension that produced it, so a swapped embedder can never silently score vectors from a foreign space.
@@ -201,7 +203,7 @@ The standalone [`apps/examples`](apps/examples) application is a suite of execut
 | **Streaming** | Sequential one-event/one-result rule processing with throughput and decision output |
 | **Proof** | Backward chaining with provability, missing facts, and a visible proof tree |
 
-Check out the [browser examples gallery](docs/EXAMPLES.md) to see these interactive WebAssembly demonstrations in action.
+Check out the [browser examples gallery](docs/EXAMPLES.md) to see these interactive WebAssembly demonstrations in action, or **[run them live in your browser](https://ops-ping.github.io/vector-rules/)** — no install and no server, since the engine and the embedding model are both WebAssembly.
 
 ---
 

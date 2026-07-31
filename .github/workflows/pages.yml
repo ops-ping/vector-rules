@@ -1,0 +1,85 @@
+name: Pages
+
+# Publish the browser examples so the engine can be tried in one click. The site
+# is static and model-free: seeded vectors come from its bucket cache, and the
+# pinned quantization streams from the CDN only on a genuine cache miss.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/examples/**"
+      - "crates/vrules-wasm/**"
+      - "crates/vrules-core/**"
+      - "release/pins.env"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; queue rather than cancel so a published site is never
+# left half-replaced.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.0"
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/examples/package-lock.json
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked
+
+      - name: Install dependencies
+        working-directory: apps/examples
+        run: npm ci
+
+      - name: Build static site
+        working-directory: apps/examples
+        run: |
+          set -a && . "$GITHUB_WORKSPACE/release/pins.env" && set +a
+          npm run build:deploy
+
+      - name: Verify the artifact ships no model
+        working-directory: apps/examples
+        run: |
+          if find dist -name '*.gguf' | grep -q .; then
+            echo "a model file leaked into dist/; the deploy must stay model-free" >&2
+            exit 1
+          fi
+          echo "site size: $(du -sh dist | cut -f1)"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/examples/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

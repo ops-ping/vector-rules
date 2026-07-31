@@ -1,5 +1,8 @@
 # Browser examples
 
+**[Try them live →](https://ops-ping.github.io/vector-rules/)** — no install, no
+sign-up, no server.
+
 The `apps/examples` app is a standalone, server-free build of the capability
 demonstrations. Everything runs in the browser: the rule engine (`vrules-wasm`)
 and EmbeddingGemma both execute as WebAssembly, with no daemon.
@@ -8,7 +11,8 @@ Embeddings are computed by wllama, which uses WebGPU when the browser exposes a
 GPU adapter and falls back to CPU otherwise — the header badge reports the active
 backend. A cache-through tier serves vectors from a static, content-addressed
 cache seeded for the example corpora, so most demonstrations run without
-downloading the model; free-form input falls back to in-browser inference.
+downloading the model; free-form input falls back to in-browser inference,
+streaming the pinned quantization from the CDN on first use.
 
 ## Address verification
 
