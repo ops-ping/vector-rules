@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img"
+     aria-label="vector-rules: a vector crossing a rule, with the decision point marked">
+  <rect width="32" height="32" rx="7" fill="#0d1117"/>
+  <rect x="0.75" y="0.75" width="30.5" height="30.5" rx="6.25" fill="none" stroke="#30363d" stroke-width="1.5"/>
+  <!-- the rule -->
+  <line x1="4.5" y1="21" x2="27.5" y2="21" stroke="#8b949e" stroke-width="2.6" stroke-linecap="round"/>
+  <!-- the vector -->
+  <g fill="none" stroke="#58a6ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="8" y1="28" x2="24" y2="6"/>
+    <polyline points="23.87,13.32 24,6 17.07,8.38"/>
+  </g>
+  <!-- the decision -->
+  <circle cx="13.1" cy="21" r="3.2" fill="#3fb950" stroke="#0d1117" stroke-width="1.4"/>
+</svg>

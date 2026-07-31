@@ -10,9 +10,42 @@ and EmbeddingGemma both execute as WebAssembly, with no daemon.
 Embeddings are computed by wllama, which uses WebGPU when the browser exposes a
 GPU adapter and falls back to CPU otherwise — the header badge reports the active
 backend. A cache-through tier serves vectors from a static, content-addressed
-cache seeded for the example corpora, so most demonstrations run without
-downloading the model; free-form input falls back to in-browser inference,
-streaming the pinned quantization from the CDN on first use.
+cache seeded for the example corpora, so every prepared demonstration runs
+without downloading the model; free-form input falls back to in-browser
+inference, streaming the pinned quantization from the CDN on first use.
+
+The header states which of those is happening. Before any download it says the
+prepared inputs come from the seeded cache and that editing text fetches the
+model once (236 MB). During the fetch it shows a progress bar with transferred
+bytes; on a return visit it reports that the model was already in the browser
+rather than re-fetching it. Once loaded it names the running model, its digest,
+and a running count of embeddings computed in that tab — so a claim that the real
+model produced a given vector is checkable from the page itself.
+
+The model is stored in OPFS, so the download happens once per browser.
+
+## Verifying the examples
+
+`npm run verify` builds the app, serves the built `dist/`, drives all five
+examples in headless Chrome, and captures the screenshots below. It fails the run
+on any uncaught exception, console error, failed request, missing expected
+selector, or a seeded-cache miss.
+
+It also fails if a prepared input triggers a model download. That guard is what
+keeps `scripts/seed-cache.mjs` honest: the seed corpus mirrors string constants
+in the example components, and drift there would silently cost every visitor a
+236 MB download instead of a cache hit.
+
+```
+cd apps/examples
+npm run verify        # build + drive + assert + capture
+npm run screenshots   # capture against an already-running server
+npm run seed          # re-seed the vector cache (needs llama-server + the GGUF)
+npm run icons         # re-rasterize favicon.svg into the PNG/ICO fallbacks
+```
+
+The captured screenshots double as the fallback imagery in this document for
+readers who cannot run the live site.
 
 ## Address verification
 

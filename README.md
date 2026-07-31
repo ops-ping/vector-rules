@@ -2,7 +2,7 @@
 
 **A semantic execution substrate: vector math as a first-class operand inside a deterministic rules engine.**
 
-**[▶ Try it in your browser](https://ops-ping.github.io/vector-rules/)** — the rule engine and the embedding model are both WebAssembly, so the demos run with no install and no server.
+**[▶ Try it in your browser](https://ops-ping.github.io/vector-rules/)** — five live demonstrations, no install and no server. The rule engine and the embedding model are both WebAssembly; the prepared inputs are served from a seeded vector cache, and typing your own text loads EmbeddingGemma into the tab and computes for real.
 
 Most AI systems make the model the judge and leave code as the tool it calls. `vector-rules` turns that around. The model becomes an instrument that supplies measurements, and deterministic, Git-governed rules make the decision — and prove how they reached it. Because the kernel is WebAssembly and WASI, that same semantic reasoning runs unchanged in a browser tab, a Rust backend, and a distributed cloud cache: any modern application surface, rather than a hosted control plane.
 

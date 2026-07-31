@@ -41,6 +41,64 @@ export async function getBackendInfo() {
   return { webgpuApi: !!navigator.gpu, adapter, backend };
 }
 
+// --- observable model state -------------------------------------------------
+//
+// A seeded vector is a file read; a computed one runs the real model. That
+// difference is the whole claim, so it is reported rather than hidden: the model
+// state drives an explicit notice before the download, byte progress during it,
+// and a persistent model identity afterwards.
+
+const modelState = {
+  // 'absent'      — no compute attempted; every vector so far came from cache
+  // 'starting'    — model requested, transfer not yet characterized
+  // 'downloading' — bytes moving over the network
+  // 'preparing'   — bytes resident, ggml loading them
+  // 'ready'       — inference available in this tab
+  // 'error'
+  phase: 'absent',
+  loaded: 0,
+  total: 0,
+  fromCache: false,
+  model: null,
+  revision: null,
+  bytes: null,
+  error: null
+};
+
+const modelWatchers = new Set();
+
+function emitModel() {
+  const snapshot = { ...modelState };
+  for (const fn of modelWatchers) fn(snapshot);
+}
+
+/** Subscribe to model download/load state. Fires immediately with the current value. */
+export function subscribeModel(fn) {
+  modelWatchers.add(fn);
+  fn({ ...modelState });
+  return () => modelWatchers.delete(fn);
+}
+
+// --- observable resolution source -------------------------------------------
+
+const resolution = { seeded: 0, computed: 0, memory: 0, last: null };
+const resolutionWatchers = new Set();
+
+function emitResolution(source, text) {
+  resolution[source] += 1;
+  resolution.last = { source, text, at: Date.now() };
+  const snapshot = { ...resolution };
+  for (const fn of resolutionWatchers) fn(snapshot);
+}
+
+/** Subscribe to per-embedding provenance: served from cache, or computed here. */
+export function subscribeResolution(fn) {
+  resolutionWatchers.add(fn);
+  fn({ ...resolution });
+  return () => resolutionWatchers.delete(fn);
+}
+
+
 // Drops llama.cpp's per-eval DEBUG flood but keeps warnings, errors, and the
 // `ggml_webgpu:` line that reveals whether the GPU backend engaged.
 const filteringLogger = {
@@ -76,6 +134,7 @@ function ensureManifest() {
       return {
         info: { model: manifest.name, revision: manifest.sha256, dimensions: manifest.dimensions },
         file: manifest.file,
+        bytes: manifest.bytes ?? null,
         cacheBase
       };
     })().catch((e) => {
@@ -93,19 +152,54 @@ let modelPromise = null;
 function ensureModel() {
   if (!modelPromise) {
     modelPromise = (async () => {
-      const { file } = await ensureManifest();
+      const { file, bytes, info } = await ensureManifest();
+      modelState.phase = 'starting';
+      modelState.model = info.model;
+      modelState.revision = info.revision;
+      modelState.bytes = bytes;
+      modelState.loaded = 0;
+      modelState.total = bytes ?? 0;
+      modelState.error = null;
+      emitModel();
+
       const wllama = new Wllama({ default: wasmSingleThread }, { logger: filteringLogger });
+
+      // An already-cached model reports complete on its first callback, so the
+      // first event distinguishes a network transfer from an OPFS cache hit.
+      let firstProgress = true;
+      const progressCallback = ({ loaded, total }) => {
+        if (firstProgress) {
+          firstProgress = false;
+          modelState.fromCache = total > 0 && loaded >= total;
+          modelState.phase = modelState.fromCache ? 'preparing' : 'downloading';
+        } else if (modelState.phase === 'starting') {
+          modelState.phase = 'downloading';
+        }
+        modelState.loaded = loaded;
+        modelState.total = total || modelState.total;
+        if (!modelState.fromCache && total > 0 && loaded >= total) {
+          modelState.phase = 'preparing';
+        }
+        emitModel();
+      };
+
       // Leave pooling_type unset: the GGUF declares its own
       // (`gemma-embedding.pooling_type`). n_gpu_layers offloads every layer to
       // WebGPU when an adapter is available (wllama's default is already high;
       // set explicitly to document the intent).
       await wllama.loadModelFromUrl(new URL(file, MODEL_DIR).href, {
         embeddings: true,
-        n_gpu_layers: 999
+        n_gpu_layers: 999,
+        progressCallback
       });
+      modelState.phase = 'ready';
+      emitModel();
       return wllama;
     })().catch((e) => {
       modelPromise = null;
+      modelState.phase = 'error';
+      modelState.error = e?.message || String(e);
+      emitModel();
       throw e;
     });
   }
@@ -193,15 +287,20 @@ export async function embedText(text) {
   const url = new URL(textHash(text), cacheBase).href;
 
   const cached = await cacheMatch(url);
-  if (cached) return { info, vector: cached };
+  if (cached) {
+    emitResolution('memory', text);
+    return { info, vector: cached };
+  }
 
   const seeded = await fetchSeeded(url);
   if (seeded) {
     await cachePut(url, seeded);
+    emitResolution('seeded', text);
     return { info, vector: seeded };
   }
 
   const vector = await computeSerialized(text);
   await cachePut(url, vector);
+  emitResolution('computed', text);
   return { info, vector };
 }

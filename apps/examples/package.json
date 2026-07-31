@@ -18,7 +18,9 @@
     "build:deploy": "npm run build && node scripts/prepare-deploy.mjs",
     "preview": "vite preview",
     "seed": "node scripts/seed-cache.mjs",
-    "screenshots": "node scripts/capture-screenshots.mjs"
+    "icons": "node scripts/make-icons.mjs",
+    "screenshots": "node scripts/capture-screenshots.mjs",
+    "verify": "npm run build && node scripts/capture-screenshots.mjs"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "7.1.2",

@@ -5,6 +5,7 @@
   import Prove from './lib/examples/Prove.svelte';
   import Semantic from './lib/examples/Semantic.svelte';
   import Streaming from './lib/examples/Streaming.svelte';
+  import ModelStatus from './lib/panels/ModelStatus.svelte';
   import { getBackendInfo } from './lib/embed.js';
 
   // WebGPU capability + the backend the embedder actually used. Probed on mount
@@ -72,6 +73,7 @@
     Every demonstration below runs entirely in your browser — the rule engine and
     EmbeddingGemma both execute as WebAssembly, with no server.
   </p>
+  <ModelStatus />
 </header>
 
 <main>
