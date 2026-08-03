@@ -1,87 +1,18 @@
 <script>
-  // Client-side vector reasoning uses vectors and model metadata from the host.
+  // An editable semantic rule bench. Nothing on this page is a transcript of a
+  // canned run: the rules, the asserted facts and the match string are all
+  // input, and everything shown afterwards — the output facts, which rules
+  // fired, in what order, and what each derived — is read back from the engine's
+  // own result and trace. Editing the rules changes what the trace describes,
+  // because the trace is built from the same source the engine parsed.
   import { onMount } from 'svelte';
-  import init, { RuleEngine } from 'vrules-wasm/vrules_wasm.js';
+  import init, { RuleEngine, validate_rule } from 'vrules-wasm/vrules_wasm.js';
   import wasmUrl from 'vrules-wasm/vrules_wasm_bg.wasm?url';
-  import { embedText } from '../embed.js';
+  import { embedText, probeVectorSource, subscribeModel } from '../embed.js';
+  import { splitRules, pathsRead, pathsAssigned, vectorInputs } from '../syntax.js';
+  import CodeEditor from '../panels/CodeEditor.svelte';
 
-  let rows = $state([]);
-  let chain = $state(null);
-  let status = $state('');
-  let error = $state('');
-  let busy = $state(false);
-  let dim = $state(null);
-
-  // Init the wasm module exactly once, passing the hashed asset URL (the bundled
-  // glue can't fetch its .wasm by a relative path).
-  let initPromise;
-  function ensureWasm() {
-    if (!initPromise) initPromise = init(wasmUrl);
-    return initPromise;
-  }
-
-  async function embed(text) {
-    let payload;
-    try {
-      payload = await embedText(text);
-    } catch (e) {
-      throw new Error(`embed "${text}": ${e.message}`);
-    }
-    const { info, vector } = payload;
-    if (!info?.model || !info?.revision || !info?.dimensions) {
-      throw new Error(`embed "${text}": host omitted model metadata`);
-    }
-    return { info, vector: new Float32Array(vector) };
-  }
-
-  function setEmbedding(engine, text, embedding) {
-    const { model, revision, dimensions } = embedding.info;
-    engine.set_embedding(text, embedding.vector, model, revision, dimensions);
-  }
-
-  function cosine(a, b) {
-    let dot = 0, na = 0, nb = 0;
-    for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
-    return dot / (Math.sqrt(na) * Math.sqrt(nb));
-  }
-
-  // serde-wasm-bindgen returns nested JS Maps; convert to plain objects for display.
-  function deep(v) {
-    if (v instanceof Map) { const o = {}; for (const [k, val] of v) o[k] = deep(val); return o; }
-    if (Array.isArray(v)) return v.map(deep);
-    if (v && typeof v === 'object') {
-      return Object.fromEntries(Object.entries(v).map(([k, val]) => [k, deep(val)]));
-    }
-    return v;
-  }
-
-  function detailText(r) {
-    return 'GRL rules:\n' + r.rule +
-      '\n\nEvaluated:\n' + r.exprText +
-      '\n\nEngine result + trace:\n' + JSON.stringify(r.result, null, 2);
-  }
-
-  function toggle(r) { r.open = !r.open; }
-  function toggleChain() { if (chain) chain.open = !chain.open; }
-
-  function chainDetail(c) {
-    return 'GRL rules:\n' + c.rules.join('\n\n') +
-      '\n\nEngine result + trace:\n' + JSON.stringify(c.result, null, 2);
-  }
-
-  async function run() {
-    busy = true; error = ''; rows = []; chain = null; status = 'loading wasm…';
-    try {
-      await ensureWasm();
-      status = 'fetching embeddings and model metadata from the host…';
-      const next = [];
-
-      // 1) Vector analogy algebra across candidate targets:
-      //    s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], Concept.target)
-      const [king, man, woman] = await Promise.all(
-        ['king', 'man', 'woman'].map((w) => embed(w))
-      );
-      const analogyRules = `rule "MeasureAnalogy" salience 100 no-loop {
+  const DEFAULT_RULES = `rule "MeasureAnalogy" salience 100 no-loop {
     when
         Concept.target != ""
     then
@@ -102,246 +33,587 @@ rule "GrantRoyalAccess" no-loop {
         Decision.access_granted = true;
 }`;
 
-      let queenCos = '0.000';
+  const DEFAULT_FACTS = `{
+  "Concept": {
+    "target": "queen"
+  }
+}`;
 
-      for (const target of ['queen', 'princess', 'king', 'tractor']) {
-        const tv = await embed(target);
-        const eng = new RuleEngine();
-        eng.register_rule(`rule "MeasureAnalogy" salience 100 no-loop {
-    when
-        Concept.target != ""
-    then
-        Concept.similarity = s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], Concept.target);
-}
+  // The engine reports an unresolvable vector by name; that message is the
+  // authority on what a ruleset needs, so a miss by the pre-resolver below is
+  // recovered from rather than guessed around.
+  const MISSING_EMBEDDING = /no prefetched embedding for "((?:[^"\\]|\\.)*)"/;
+  const RESOLVE_ATTEMPTS = 8;
 
-rule "AnalogyMatch" no-loop {
-    when
-        Concept.similarity > 0.80
-    then
-        Decision.is_analogy_target = true;
-}`);
-        setEmbedding(eng, 'king', king);
-        setEmbedding(eng, 'man', man);
-        setEmbedding(eng, 'woman', woman);
-        setEmbedding(eng, target, tv);
-        const res = deep(eng.evaluate('Concept', JSON.stringify({ target }), true));
-        const analogyVec = new Float32Array(king.vector.length);
-        for (let i = 0; i < king.vector.length; i++) {
-          analogyVec[i] = king.vector[i] - man.vector[i] + woman.vector[i];
-        }
-        const cos = cosine(analogyVec, tv.vector).toFixed(3);
-        if (target === 'queen') queenCos = cos;
-        next.push({
-          headline: target,
-          cos,
-          fired: (res.fired || []).includes('AnalogyMatch'),
-          rule: `rule "MeasureAnalogy" salience 100 no-loop {\n    when\n        Concept.target != ""\n    then\n        Concept.similarity = s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], Concept.target);\n}\n\nrule "AnalogyMatch" no-loop {\n    when\n        Concept.similarity > 0.80\n    then\n        Decision.is_analogy_target = true;\n}`,
-          exprText: `Concept { target: "${target}" }\nConcept.similarity = s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], "${target}") = ${cos}\nthreshold: Concept.similarity > 0.80`,
-          result: res,
-          open: false
-        });
+  let rulesText = $state(DEFAULT_RULES);
+  let factsText = $state(DEFAULT_FACTS);
+  let matchText = $state('queen');
+  let popout = $state(null); // 'rules' | 'facts' | 'output' | null
+  let result = $state(null);
+  let busy = $state(false);
+  let status = $state('');
+  let error = $state('');
+  let ready = $state(false);
+  let vectorSource = $state(''); // where the match string's vector comes from
+  let modelPhase = $state('absent');
+
+  let initPromise;
+  function ensureWasm() {
+    if (!initPromise) initPromise = init(wasmUrl);
+    return initPromise;
+  }
+
+  // serde-wasm-bindgen returns nested JS Maps; convert to plain objects.
+  function deep(value) {
+    if (value instanceof Map) {
+      const out = {};
+      for (const [key, inner] of value) out[key] = deep(inner);
+      return out;
+    }
+    if (Array.isArray(value)) return value.map(deep);
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, deep(v)]));
+    }
+    return value;
+  }
+
+  // --- live validation of the two editable sources --------------------------
+
+  function checkFacts(text) {
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      return { ok: false, message: e.message };
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { ok: false, message: 'facts must be a JSON object keyed by fact type' };
+    }
+    // `evaluate` asserts one fact type and adds an empty `Decision` itself.
+    const types = Object.keys(parsed).filter((key) => key !== 'Decision');
+    if (types.length !== 1) {
+      return {
+        ok: false,
+        message: `assert exactly one fact type (Decision is added by the engine) — found ${types.length}`
+      };
+    }
+    const body = parsed[types[0]];
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return { ok: false, message: `${types[0]} must be a JSON object` };
+    }
+    return { ok: true, message: '', type: types[0], body };
+  }
+
+  function checkRules(text) {
+    if (!ready) return { ok: true, message: '' };
+    const report = deep(validate_rule(text));
+    if (report?.ok) return { ok: true, message: '' };
+    const message = (report?.errors ?? []).map((e) => e.message).join('; ');
+    return { ok: false, message: message || 'the rule parser rejected this source' };
+  }
+
+  let factsCheck = $derived(checkFacts(factsText));
+  let rulesCheck = $derived(checkRules(rulesText));
+  let rules = $derived(splitRules(rulesText));
+  // The match string is whichever fact field the rules feed into vector math.
+  let matchPath = $derived(vectorInputs(rulesText).paths[0] ?? '');
+  let runnable = $derived(ready && factsCheck.ok && rulesCheck.ok);
+
+  function factValue(facts, path) {
+    const [type, field] = path.split('.');
+    const value = facts?.[type]?.[field];
+    return value === undefined ? null : value;
+  }
+
+  function boundMatch(check, path) {
+    if (!check.ok || !path) return null;
+    const [type, field] = path.split('.');
+    if (type !== check.type) return null;
+    const value = check.body[field];
+    return typeof value === 'string' ? value : null;
+  }
+
+  // The parameter and the input facts are two views of one value. Editing the
+  // facts pulls the parameter along; typing the parameter patches the facts.
+  $effect(() => {
+    const bound = boundMatch(factsCheck, matchPath);
+    if (bound !== null && bound !== matchText) matchText = bound;
+  });
+
+  function onMatchInput(event) {
+    matchText = event.currentTarget.value;
+    if (!factsCheck.ok || !matchPath) return;
+    const [type, field] = matchPath.split('.');
+    if (type !== factsCheck.type) return;
+    const next = JSON.parse(factsText);
+    next[type][field] = matchText;
+    factsText = JSON.stringify(next, null, 2);
+  }
+
+  // Whether running will read a file or download the model, answered before the
+  // run rather than discovered during it.
+  $effect(() => {
+    const text = matchText;
+    if (!text) {
+      vectorSource = '';
+      return;
+    }
+    let live = true;
+    const timer = setTimeout(async () => {
+      const source = await probeVectorSource(text).catch(() => '');
+      if (live) vectorSource = source;
+    }, 200);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  });
+
+  onMount(() => {
+    // Loading the engine is not running the example: it makes the rule parser
+    // available so edits are validated as they are typed.
+    ensureWasm().then(
+      () => (ready = true),
+      (e) => (error = `engine failed to load: ${e.message}`)
+    );
+    return subscribeModel((state) => (modelPhase = state.phase));
+  });
+
+  // --- execution -------------------------------------------------------------
+
+  /** Resolve one text's vector and hand it to the engine, recording its source. */
+  async function resolve(engine, provenance, text) {
+    if (provenance.has(text)) return;
+    let payload;
+    try {
+      payload = await embedText(text);
+    } catch (e) {
+      throw new Error(`embed "${text}": ${e.message}`);
+    }
+    const { info, vector, source } = payload;
+    if (!info?.model || !info?.revision || !info?.dimensions) {
+      throw new Error(`embed "${text}": host omitted model metadata`);
+    }
+    engine.set_embedding(text, new Float32Array(vector), info.model, info.revision, info.dimensions);
+    provenance.set(text, { source, dimensions: info.dimensions, model: info.model });
+  }
+
+  /** Texts the rules visibly need vectors for, before the engine is asked. */
+  function plannedTexts(check) {
+    const { literals, paths } = vectorInputs(rulesText);
+    const texts = new Set(literals);
+    for (const path of paths) {
+      const value = boundMatch(check, path);
+      if (value) texts.add(value);
+    }
+    return [...texts];
+  }
+
+  function buildTrace(outcome) {
+    const byName = new Map(rules.map((rule) => [rule.name, rule]));
+    const fired = outcome.fired ?? [];
+    const firedNames = new Set(fired);
+    const alreadyDerived = new Set();
+    const steps = [];
+
+    // Firing order first — this is what ran — then everything that stayed idle.
+    for (const name of fired) {
+      const rule = byName.get(name);
+      const reads = rule ? pathsRead(rule) : [];
+      const assigns = rule ? pathsAssigned(rule) : [];
+      steps.push({
+        name,
+        rule,
+        fired: true,
+        chained: reads.some((path) => alreadyDerived.has(path)),
+        derived: assigns.map((path) => ({ path, value: factValue(outcome.facts, path) }))
+      });
+      for (const path of assigns) alreadyDerived.add(path);
+    }
+    for (const rule of rules) {
+      if (firedNames.has(rule.name)) continue;
+      steps.push({ name: rule.name, rule, fired: false, chained: false, derived: [] });
+    }
+    return { steps, derivedPaths: [...alreadyDerived] };
+  }
+
+  async function run() {
+    if (busy) return;
+    busy = true;
+    error = '';
+    result = null;
+    status = 'loading engine…';
+    try {
+      await ensureWasm();
+      ready = true;
+
+      const facts = checkFacts(factsText);
+      if (!facts.ok) throw new Error(`input facts — ${facts.message}`);
+      const grl = checkRules(rulesText);
+      if (!grl.ok) throw new Error(`rules — ${grl.message}`);
+
+      const engine = new RuleEngine();
+      engine.register_rule(rulesText);
+
+      const provenance = new Map();
+      const planned = plannedTexts(facts);
+      if (planned.length) {
+        status = `resolving ${planned.length} vector${planned.length === 1 ? '' : 's'}…`;
+        await Promise.all(planned.map((text) => resolve(engine, provenance, text)));
       }
 
-      // 2) Forward chaining — inline vector math writes similarity into a fact,
-      //    the category rule thresholds it, and the decision rule grants access.
-      const queen = await embed('queen');
-      const chainRules = [
-        `rule "MeasureAnalogy" salience 100 no-loop {
-    when
-        Concept.target != ""
-    then
-        Concept.similarity = s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], Concept.target);
-}`,
-        `rule "AnalogyCategory" salience 50 no-loop {
-    when
-        Concept.similarity > 0.80
-    then
-        Concept.category = "royalty";
-}`,
-        `rule "GrantRoyalAccess" no-loop {
-    when
-        Concept.category == "royalty"
-    then
-        Decision.access_granted = true;
-}`
-      ];
-      const ceng = new RuleEngine();
-      for (const rule of chainRules) ceng.register_rule(rule);
-      setEmbedding(ceng, 'king', king);
-      setEmbedding(ceng, 'man', man);
-      setEmbedding(ceng, 'woman', woman);
-      setEmbedding(ceng, 'queen', queen);
-      const cres = deep(ceng.evaluate('Concept', JSON.stringify({ target: 'queen' }), true));
-      const firedC = cres.fired || [];
-      chain = {
-        fact: 'Concept { target: "queen" }',
-        fired: firedC,
-        rules: chainRules,
-        result: cres,
-        open: false,
-        steps: [
-          {
-            rule: 'MeasureAnalogy',
-            cond: 'Concept.target != ""',
-            derives: `Concept.similarity = s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], "queen") = ${queenCos}`,
-            fired: firedC.includes('MeasureAnalogy'),
-            chained: false
-          },
-          {
-            rule: 'AnalogyCategory',
-            cond: `Concept.similarity = ${queenCos} > 0.80`,
-            derives: 'Concept.category = "royalty"',
-            fired: firedC.includes('AnalogyCategory'),
-            chained: true
-          },
-          {
-            rule: 'GrantRoyalAccess',
-            cond: 'Concept.category == "royalty"',
-            derives: 'Decision.access_granted = true',
-            fired: firedC.includes('GrantRoyalAccess'),
-            chained: true
-          }
-        ]
+      status = 'evaluating…';
+      let outcome = null;
+      const started = performance.now();
+      for (let attempt = 0; attempt < RESOLVE_ATTEMPTS && !outcome; attempt++) {
+        try {
+          outcome = deep(engine.evaluate(facts.type, JSON.stringify(facts.body), true));
+        } catch (e) {
+          const missing = MISSING_EMBEDDING.exec(String(e?.message ?? e));
+          if (!missing) throw new Error(String(e?.message ?? e));
+          const text = missing[1];
+          status = `resolving vector for "${text}"…`;
+          await resolve(engine, provenance, text);
+        }
+      }
+      if (!outcome) {
+        throw new Error(`rules still requested unresolved vectors after ${RESOLVE_ATTEMPTS} attempts`);
+      }
+      const wallMs = performance.now() - started;
+
+      const { steps, derivedPaths } = buildTrace(outcome);
+      result = {
+        outcome,
+        steps,
+        derivedPaths,
+        wallMs,
+        factType: facts.type,
+        assertText: JSON.stringify(facts.body),
+        output: JSON.stringify(outcome.facts ?? {}, null, 2),
+        vectors: [...provenance].map(([text, meta]) => ({ text, ...meta })),
+        ruleCount: rules.length
       };
 
-      rows = next;
-      dim = king.vector.length;
-      status = `done — dim ${dim}, vectors and model identity supplied by the host.`;
+      const fired = outcome.fired?.length ?? 0;
+      const dims = result.vectors[0]?.dimensions;
+      status =
+        `done — ${fired} of ${rules.length} rules fired in ${wallMs.toFixed(1)} ms` +
+        (dims ? `, over ${result.vectors.length} vectors of dim ${dims}` : '');
     } catch (e) {
       status = '';
-      error = e.message;
+      error = e.message ?? String(e);
     } finally {
       busy = false;
     }
   }
 
-  // Run as soon as the panel mounts — the demo populates itself, no click needed.
-  onMount(run);
+  // --- presentation ----------------------------------------------------------
+
+  function toggle(panel) {
+    popout = popout === panel ? null : panel;
+  }
+
+  // The engine's own time is routinely sub-millisecond, where three decimals of
+  // a millisecond reads as a broken zero rather than a fast run.
+  function duration(nanos) {
+    const ns = nanos ?? 0;
+    return ns < 1e6 ? `${(ns / 1000).toFixed(1)} µs` : `${(ns / 1e6).toFixed(2)} ms`;
+  }
+
+  function show(value) {
+    if (typeof value === 'number') {
+      return Number.isInteger(value) ? String(value) : value.toFixed(4);
+    }
+    return JSON.stringify(value);
+  }
+
+  const SOURCE_LABEL = {
+    memory: 'cached in this browser',
+    seeded: 'served from the seeded cache',
+    computed: 'computed by EmbeddingGemma in this tab'
+  };
+
+  let matchNote = $derived(
+    vectorSource === 'compute'
+      ? modelPhase === 'ready'
+        ? 'not cached — computed in this tab by the loaded model'
+        : 'not cached — running downloads EmbeddingGemma (236 MB), once'
+      : vectorSource
+        ? `${SOURCE_LABEL[vectorSource]} — no model download`
+        : ''
+  );
+
+  let popoutTitle = $derived(
+    popout === 'rules'
+      ? 'Rules — GRL'
+      : popout === 'facts'
+        ? 'Input facts — JSON'
+        : popout === 'output'
+          ? 'Output facts — after forward chaining'
+          : ''
+  );
 </script>
+
+<svelte:window
+  onkeydown={(e) => {
+    if (e.key === 'Escape' && popout) popout = null;
+  }}
+/>
 
 <section>
   <div class="head-row">
-    <h3>Semantic vector rules — in the browser</h3>
-    <button class="rerun" onclick={run} disabled={busy}>{busy ? 'running…' : '↻ Re-run'}</button>
+    <h3>Semantic vector rules — editable, in the browser</h3>
+    <button class="primary" onclick={run} disabled={busy || !runnable}>
+      {busy ? 'running…' : '▶ Run'}
+    </button>
   </div>
-  <p class="muted">
-    The wasm rule engine evaluates GRL vector functions here in your browser against
-    real vectors and model identity from the host's configured embedding model. Function
-    names carry their return kind: <code>s_</code> raw scalar (measure, never threshold),
-    <code>c_</code> calibrated (thresholdable), <code>b_</code> boolean, <code>m_</code> metadata.
-    Click any row to drill into the rules + the engine trace.
-    {#if status}<span class="status">— {status}</span>{/if}
+  <p class="muted lede">
+    The rules, the asserted facts and the match string below are all yours to edit. The wasm
+    rule engine parses what you type and evaluates GRL vector functions against real vectors
+    from EmbeddingGemma. Function names carry their return kind: <code>s_</code> raw scalar
+    (measure, never threshold), <code>c_</code> calibrated (thresholdable), <code>b_</code>
+    boolean, <code>m_</code> metadata.
   </p>
 
-  {#if error}<div class="error">Error: {error}</div>{/if}
-
-  {#if rows.length}
-    <h3 class="section-title">Vector Analogy Algebra — <code>(king − man + woman) ≈ target</code></h3>
-    <p class="muted">
-      A measurement rule evaluates Lisp-style vector math <code>s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], target)</code> in
-      <code>then</code>; the decision rule thresholds the fact.
-    </p>
-  {/if}
-
-  <div class="rows">
-    {#each rows as r}
-      <div
-        class="vrow"
-        class:fired={r.fired}
-        role="button"
-        tabindex="0"
-        onclick={() => toggle(r)}
-        onkeydown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(r); }
-        }}
-      >
-        <div class="head">
-          <span class="word">{r.headline}</span>
-          <span class="muted">score = <code>{r.cos}</code></span>
-          <span class="pill {r.fired ? 'hit' : 'miss'}">{r.fired ? 'FIRED ✓' : 'did not fire'}</span>
-          <span class="hint">▸ {r.open ? 'hide' : 'rule'}</span>
-        </div>
-        {#if r.open}
-          <pre class="detail">{detailText(r)}</pre>
-        {/if}
-      </div>
-    {/each}
+  <div class="controls">
+    <label class="param">
+      <span>match string {#if matchPath}<code>{matchPath}</code>{/if}</span>
+      <input
+        value={matchText}
+        oninput={onMatchInput}
+        disabled={!matchPath}
+        spellcheck="false"
+        autocomplete="off"
+        placeholder={matchPath ? 'queen' : 'no fact field is passed to a vector function'}
+      />
+    </label>
+    {#if matchPath}
+      <span class="src" data-source={vectorSource} class:warn={vectorSource === 'compute'}>
+        {matchNote}
+      </span>
+    {:else}
+      <span class="src">the rules pass no fact field to a vector function — edit the input facts directly</span>
+    {/if}
   </div>
 
-  {#if chain}
-    <h3 class="chain-title">Forward chaining — inline vector algebra drives deterministic decisions</h3>
-    <p class="muted">
-      One canonical evaluation in this wasm engine. <code>MeasureAnalogy</code> evaluates inline vector algebra
-      <code>s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], target)</code>, <code>AnalogyCategory</code>
-      derives a category from the threshold, and <code>GrantRoyalAccess</code> fires on the derived category.
-    </p>
-    <div
-      class="chain"
-      role="button"
-      tabindex="0"
-      onclick={toggleChain}
-      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleChain(); } }}
+  <div class="tabs" role="group" aria-label="Rules, facts and results">
+    <button class:open={popout === 'rules'} onclick={() => toggle('rules')} data-panel="rules">
+      Rules <span class="count" class:bad={!rulesCheck.ok}>{rules.length} GRL</span>
+    </button>
+    <button class:open={popout === 'facts'} onclick={() => toggle('facts')} data-panel="facts">
+      Input facts <span class="count" class:bad={!factsCheck.ok}>{factsCheck.ok ? factsCheck.type : 'invalid'}</span>
+    </button>
+    <button
+      class:open={popout === 'output'}
+      onclick={() => toggle('output')}
+      data-panel="output"
+      disabled={!result}
     >
-      <div class="chain-fact"><span class="muted">assert</span> <code>{chain.fact}</code></div>
-      {#each chain.steps as s}
-        <div class="step" class:chained={s.chained}>
-          <div class="step-head">
-            {#if s.chained}<span class="link">└─▶ chains to</span>{/if}
-            <span class="rule">{s.rule}</span>
-            <span class="pill {s.fired ? 'hit' : 'miss'}">{s.fired ? 'FIRED ✓' : 'did not fire'}</span>
+      Output facts
+      <span class="count">{result ? `${result.derivedPaths.length} derived` : 'not run'}</span>
+    </button>
+  </div>
+
+  <!-- Height is reserved so a run's progress never shifts the panels below it. -->
+  <div class="status-row" class:bad={!!error}>{error || status}</div>
+
+  <div class="area" class:open={!!popout}>
+    <div class="trace" data-state={result ? 'populated' : 'empty'}>
+      <div class="trace-head">
+        <strong>Execution trace</strong>
+        {#if result}
+          <div class="muted metrics">
+            {result.outcome.trace?.cycles ?? 0} cycles ·
+            {result.outcome.trace?.rules_evaluated ?? 0} evaluated ·
+            {result.outcome.trace?.rules_fired ?? 0} fired ·
+            {duration(result.outcome.trace?.execution_time_ns)} in the engine
           </div>
-          <div class="step-when"><span class="kw">when</span> <code>{s.cond}</code></div>
-          <div class="step-then"><span class="kw">then</span> <code>{s.derives}</code></div>
+        {/if}
+      </div>
+
+      {#if !result}
+        <p class="empty">
+          Nothing has run yet. Edit anything above and press <strong>Run</strong> — the fired
+          rules, what each one derived, and the resulting facts are all read back from the
+          engine after it executes.
+        </p>
+      {:else}
+        <div class="assert">
+          <span class="kw">assert</span>
+          <code>{result.factType} {result.assertText}</code>
         </div>
-      {/each}
-      <div class="hint">▸ {chain.open ? 'hide rules + trace' : 'show rules + trace'}</div>
-      {#if chain.open}
-        <pre class="detail">{chainDetail(chain)}</pre>
+        {#each result.steps as step, index}
+          <div class="step" class:fired={step.fired} class:chained={step.chained}>
+            <div class="step-head">
+              <span class="ord">{step.fired ? `${index + 1}.` : '—'}</span>
+              <span class="rule">{step.name}</span>
+              {#if step.rule?.salience !== null && step.rule?.salience !== undefined}
+                <span class="muted tag">salience {step.rule.salience}</span>
+              {/if}
+              <span class="pill {step.fired ? 'hit' : 'miss'}">
+                {step.fired ? 'FIRED ✓' : 'did not fire'}
+              </span>
+              {#if step.chained}<span class="link">chained from a derived fact</span>{/if}
+            </div>
+            {#if step.rule}
+              <div class="clause"><span class="kw">when</span><code>{step.rule.when}</code></div>
+              <div class="clause"><span class="kw">then</span><code>{step.rule.then}</code></div>
+            {/if}
+            {#each step.derived as entry}
+              <div class="clause derived">
+                <span class="kw">⇒</span><code>{entry.path} = {show(entry.value)}</code>
+              </div>
+            {/each}
+          </div>
+        {/each}
+
+        <div class="vectors">
+          <span class="muted"
+            >{result.vectors[0]?.dimensions ? `vectors · dim ${result.vectors[0].dimensions}` : 'vectors'}</span
+          >
+          {#each result.vectors as vector}
+            <span class="chip" data-source={vector.source} title={SOURCE_LABEL[vector.source] ?? vector.source}>
+              {vector.text}<span class="chip-src">{vector.source}</span>
+            </span>
+          {/each}
+        </div>
       {/if}
     </div>
-  {/if}
+
+    {#if popout}
+      <div class="popout" role="dialog" aria-label={popoutTitle}>
+        <div class="popout-head">
+          <strong>{popoutTitle}</strong>
+          <button class="close" onclick={() => (popout = null)} aria-label="Close panel">✕</button>
+        </div>
+
+        {#if popout === 'rules'}
+          <CodeEditor bind:value={rulesText} lang="grl" rows={18} label="Rules, GRL source" />
+          <div class="foot" class:bad={!rulesCheck.ok}>
+            {rulesCheck.ok
+              ? `parses — ${rules.length} rule${rules.length === 1 ? '' : 's'}, checked by the engine's own parser as you type`
+              : rulesCheck.message}
+          </div>
+        {:else if popout === 'facts'}
+          <CodeEditor bind:value={factsText} lang="json" rows={10} label="Input facts, JSON" />
+          <div class="foot" class:bad={!factsCheck.ok}>
+            {factsCheck.ok
+              ? `asserts one ${factsCheck.type} fact; the engine adds an empty Decision fact alongside it`
+              : factsCheck.message}
+          </div>
+        {:else if result}
+          <div class="derived-list">
+            {#each result.derivedPaths as path}<code class="badge">{path}</code>{:else}
+              <span class="muted">no fact was derived by this run</span>
+            {/each}
+          </div>
+          <CodeEditor value={result.output} lang="json" rows={16} label="Output facts, JSON" />
+          <div class="foot">
+            every fact after forward chaining, read back from the engine — the asserted fact
+            plus whatever the rules derived
+          </div>
+        {/if}
+      </div>
+    {/if}
+  </div>
 </section>
 
 <style>
-  section { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; padding: 14px; max-width: 720px; }
+  section {
+    position: relative;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    max-width: 980px;
+  }
   h3 { margin: 0 0 4px; font-size: 14px; }
   .muted { font-size: 12px; }
   .head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-  .rerun {
-    flex: none; font-size: 11px; padding: 4px 10px; border: 1px solid var(--border);
-    border-radius: 6px; background: var(--bg-elev2); color: var(--fg-muted); cursor: pointer;
+  .lede { max-width: 78ch; }
+
+  .controls { display: flex; align-items: flex-end; gap: 12px; margin: 12px 0 10px; flex-wrap: wrap; }
+  .param { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--fg-muted); }
+  .param code { color: var(--fg-muted); }
+  .param input { width: 260px; font-family: var(--mono); }
+  .src { font-size: 11.5px; color: var(--fg-muted); padding-bottom: 7px; }
+  .src.warn { color: var(--amber); }
+
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tabs button { font-size: 12px; padding: 5px 10px; display: flex; align-items: center; gap: 7px; }
+  .tabs button.open { border-color: var(--accent); color: var(--accent); background: var(--bg-elev2); }
+  .count {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--fg-muted); border-left: 1px solid var(--border); padding-left: 7px;
   }
-  .rerun:hover:not(:disabled) { color: var(--fg); }
-  .rerun:disabled { opacity: 0.6; cursor: default; }
-  .status { color: var(--fg-muted); }
-  .rows { margin-top: 8px; }
-  .vrow { border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; margin: 6px 0; cursor: pointer; }
-  .vrow:hover { background: var(--bg-elev2); }
-  .head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .word { font-weight: 600; }
-  .hint { color: var(--fg-muted); font-size: 11px; margin-left: auto; }
-  .pill.hit { color: var(--green); }
-  .pill.miss { color: var(--fg-muted); }
-  .section-title { margin: 16px 0 4px; font-size: 14px; }
-  .chain-title { margin: 22px 0 4px; font-size: 14px; }
-  .chain {
-    margin-top: 10px; border: 1px solid var(--border); border-left: 3px solid var(--green);
-    border-radius: 6px; padding: 12px 14px; cursor: pointer;
+  .count.bad { color: var(--red); }
+
+  .status-row {
+    min-height: 1.5em;
+    font-size: 11.5px;
+    color: var(--fg-muted);
+    margin-top: 8px;
   }
-  .chain:hover { background: var(--bg-elev2); }
-  .chain-fact { font-size: 12px; margin-bottom: 10px; }
-  .chain-fact .muted { text-transform: uppercase; letter-spacing: 0.04em; margin-right: 6px; }
-  .step { padding: 8px 0; }
-  .step.chained { padding-left: 14px; }
-  .step-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
-  .step-head .rule { font-weight: 600; }
+  .status-row.bad { color: var(--red); }
+
+  /* The pop-out floats over this area, so the trace gives up exactly the width
+     it covers, plus a gutter, rather than being hidden behind it. */
+  .area { position: relative; margin-top: 4px; min-height: 360px; --popout-width: min(560px, 100%); }
+  .area.open .trace { padding-right: calc(var(--popout-width) + 16px); }
+
+  .trace { border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; background: var(--bg); }
+  .trace-head strong { font-size: 13px; }
+  .metrics { margin-top: 2px; }
+  .empty { font-size: 12px; color: var(--fg-muted); margin: 10px 0 4px; max-width: 62ch; }
+  .assert { font-size: 12px; margin: 10px 0 4px; }
+
+  .step { padding: 8px 0; border-top: 1px solid var(--border); }
+  .step:first-of-type { border-top: 0; }
+  .step.chained { padding-left: 14px; border-left: 2px solid var(--green); }
+  .step:not(.fired) { opacity: 0.62; }
+  .step-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 3px; }
+  .step-head .ord { color: var(--fg-muted); font-size: 11px; width: 16px; }
+  .step-head .rule { font-weight: 600; font-size: 12.5px; }
+  .step-head .tag { font-size: 11px; }
   .step-head .link { color: var(--green); font-size: 11px; font-weight: 600; }
-  .step-when, .step-then { font-size: 11.5px; margin: 2px 0; }
-  .step .kw { display: inline-block; width: 38px; color: var(--fg-muted); font-size: 11px; }
-  .chain .hint { color: var(--fg-muted); font-size: 11px; margin-top: 8px; }
-  .detail {
-    margin-top: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
-    padding: 10px 12px; font-size: 11.5px; white-space: pre-wrap; overflow-x: auto;
+  .clause { display: flex; gap: 6px; font-size: 11.5px; margin: 2px 0 2px 16px; }
+  .clause code { white-space: pre-wrap; }
+  .clause .kw { color: var(--fg-muted); font-size: 11px; min-width: 34px; }
+  .derived code { color: var(--green); }
+
+  .vectors { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono);
+    font-size: 11px; border: 1px solid var(--border); border-radius: 999px; padding: 1px 4px 1px 9px;
   }
-  .error { color: var(--red); margin: 8px 0; }
+  .chip-src { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg-muted); border-left: 1px solid var(--border); padding: 0 7px 0 6px; }
+  .chip[data-source='computed'] { border-color: var(--amber); }
+  .chip[data-source='computed'] .chip-src { color: var(--amber); }
+
+  .popout {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: var(--popout-width);
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: var(--bg-elev2);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 10px 12px 12px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+  }
+  .popout-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .popout-head strong { font-size: 12.5px; }
+  .close { padding: 1px 8px; font-size: 12px; line-height: 1.5; color: var(--fg-muted); }
+  .foot { font-size: 11px; color: var(--fg-muted); }
+  .foot.bad { color: var(--red); font-family: var(--mono); }
+  .derived-list { display: flex; gap: 5px; flex-wrap: wrap; }
+  .badge { font-size: 11px; color: var(--green); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; }
+
+  @media (max-width: 780px) {
+    .popout { position: static; width: 100%; max-height: none; margin-top: 12px; }
+  }
 </style>

@@ -39,7 +39,8 @@ const OUT_DIR = path.join(APP, 'public/vrules-rest/v1/embeddings', manifest.name
 // src/lib/examples/{Semantic,FraudTriage}.svelte; drift only causes a cache
 // miss (graceful fallback to in-browser compute), never wrong output.
 const CORPUS = [
-  // Semantic.svelte: analogy operands and comparison targets
+  // Semantic.svelte: the analogy operands and default match string its rules
+  // start with, plus alternatives worth trying without paying for the model.
   'royalty', 'king', 'queen', 'man', 'woman', 'princess', 'banana', 'tractor',
   // FraudTriage URGENT_EXEMPLARS
   'urgent wire transfer needed immediately or we face penalty',

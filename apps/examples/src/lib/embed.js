@@ -252,11 +252,15 @@ async function cachePut(url, vector) {
   }
 }
 
-async function fetchSeeded(url) {
+async function fetchSeeded(url, dimensions) {
   try {
     const resp = await fetch(url);
     if (!resp.ok) return null;
-    return vectorFromLeBytes(await resp.arrayBuffer());
+    const vector = vectorFromLeBytes(await resp.arrayBuffer());
+    // A host that answers an unknown path with an SPA fallback replies 200 with
+    // a page body; without this check it would be decoded as float32s and used
+    // as an embedding. A seeded object is exactly `dimensions` floats.
+    return vector?.length === dimensions ? vector : null;
   } catch {
     return null;
   }
@@ -278,9 +282,38 @@ function l2normalize(vector) {
 // --- public API ------------------------------------------------------------
 
 /**
+ * Where `text`'s vector would come from on the next `embedText`, without
+ * computing anything: `'memory'` (already resolved in this browser),
+ * `'seeded'` (present in the static bucket) or `'compute'` (needs the model).
+ *
+ * Free-form input is the whole point of an editable example, so the UI can say
+ * up front whether pressing Run reads a file or downloads EmbeddingGemma.
+ */
+export async function probeVectorSource(text) {
+  const { info, cacheBase } = await ensureManifest();
+  const url = new URL(textHash(text), cacheBase).href;
+
+  const store = cacheApi();
+  if (store) {
+    try {
+      if (await (await store).match(url)) return 'memory';
+    } catch {
+      /* fall through to the bucket */
+    }
+  }
+
+  // The bucket tier is probed with the tier's own predicate rather than a
+  // cheaper approximation: a HEAD or a ranged read cannot tell a seeded vector
+  // from a host's SPA fallback, and a probe that disagrees with the resolver it
+  // predicts is worse than no probe. A seeded object is 3 KB.
+  return (await fetchSeeded(url, info.dimensions)) ? 'seeded' : 'compute';
+}
+
+/**
  * Embed `text` in the browser via the cache-through tier. Returns
- * `{ info: { model, revision, dimensions }, vector }` — the contract the
- * console's `embedText` returned from the daemon.
+ * `{ info: { model, revision, dimensions }, vector, source }`, where `source`
+ * is the tier that answered — `'memory'`, `'seeded'` or `'computed'` — so a
+ * caller can report the provenance of the vector it just used.
  */
 export async function embedText(text) {
   const { info, cacheBase } = await ensureManifest();
@@ -289,18 +322,18 @@ export async function embedText(text) {
   const cached = await cacheMatch(url);
   if (cached) {
     emitResolution('memory', text);
-    return { info, vector: cached };
+    return { info, vector: cached, source: 'memory' };
   }
 
-  const seeded = await fetchSeeded(url);
+  const seeded = await fetchSeeded(url, info.dimensions);
   if (seeded) {
     await cachePut(url, seeded);
     emitResolution('seeded', text);
-    return { info, vector: seeded };
+    return { info, vector: seeded, source: 'seeded' };
   }
 
   const vector = await computeSerialized(text);
   await cachePut(url, vector);
   emitResolution('computed', text);
-  return { info, vector };
+  return { info, vector, source: 'computed' };
 }

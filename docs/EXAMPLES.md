@@ -61,9 +61,15 @@ evidence, fired rules, and the parsed components.
 
 ## Semantic rules
 
-GRL vector functions evaluate over real EmbeddingGemma vectors with Lisp-style vector algebra syntax sugar (e.g., `v:add`, `v:sub`). Function names carry their return kind — `s_` raw scalar (a measurement, never thresholded), `c_` calibrated (thresholdable), `b_` boolean, `m_` metadata — and the engine's load-time lint rejects thresholding a raw score directly. A measurement rule writes `s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], target)` into a fact; an intermediate rule thresholds the similarity score to derive a category; and a decision rule fires on the derived category to grant access.
+An editable bench for vector reasoning. The GRL rules, the asserted facts and the match string are all input: the engine parses what is typed, resolves a vector for every text the rules reference, and evaluates. Nothing runs until Run is pressed, and the execution trace, the value each rule derived, and the output facts are read back from the engine's own result rather than described alongside it — editing a rule changes what the trace reports, because the trace is built from the source the engine parsed.
 
-![Semantic similarity scores over EmbeddingGemma vectors, with a forward-chaining trace from inline vector algebra to deterministic decision](examples-semantic.png)
+The rules it starts with are a three-step forward chain over Lisp-style vector algebra (`v:add`, `v:sub`): a measurement rule writes `s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], Concept.target)` into a fact, an intermediate rule thresholds that similarity to derive a category, and a decision rule fires on the derived category to grant access. Function names carry their return kind — `s_` raw scalar (a measurement, never thresholded), `c_` calibrated (thresholdable), `b_` boolean, `m_` metadata — and the engine's load-time lint rejects thresholding a raw score directly.
+
+![Editable GRL beside an execution trace read back from the engine, forward chaining from inline vector algebra to a deterministic decision](examples-semantic.png)
+
+A match string outside the seeded corpus takes the same path with nothing precomputed: EmbeddingGemma is downloaded once, the vector is computed in the tab, and every vector carries the tier that produced it.
+
+![A free-form match string embedded in the browser, its computed vector driving the same rules to a granted decision](examples-semantic-dynamic.png)
 
 ## Fraud triage
 
