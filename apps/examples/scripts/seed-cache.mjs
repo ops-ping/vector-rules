@@ -42,6 +42,19 @@ const CORPUS = [
   // Semantic.svelte: the analogy operands and default match string its rules
   // start with, plus alternatives worth trying without paying for the model.
   'royalty', 'king', 'queen', 'man', 'woman', 'princess', 'banana', 'tractor',
+  'duchess', 'empress', 'monarch',
+  // Semantic.svelte: royalty axis, positive exemplars (king and queen too)
+  'emperor', 'the royal court', 'a reigning sovereign',
+  // Semantic.svelte: royalty axis, negative exemplars (tractor too)
+  'diesel engine', 'factory machine', 'wrench', 'conveyor belt', 'warehouse pallet',
+  // Semantic.svelte: the axis calibration window. A percentile is only as
+  // portable as the population it is measured against, so this is a spread of
+  // ordinary language with enough royal usage to grade the top of the scale.
+  'bread', 'river', 'accountant', 'sneakers', 'thunderstorm', 'library',
+  'bicycle', 'coffee', 'hospital', 'guitar', 'harvest', 'passport',
+  'castle', 'parliament', 'a noble family', 'the president', 'a mayor', 'a knight',
+  'an ancient throne', 'the crown jewels', 'a coronation', 'royal decree',
+  'the palace guard', 'an imperial dynasty',
   // FraudTriage URGENT_EXEMPLARS
   'urgent wire transfer needed immediately or we face penalty',
   'the ceo needs this payment today, keep it confidential',

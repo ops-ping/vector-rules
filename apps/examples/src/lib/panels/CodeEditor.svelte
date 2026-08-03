@@ -9,6 +9,10 @@
     value = $bindable(''),
     lang = 'grl',
     rows = 14,
+    // Fill the height of the parent instead of sizing to `rows`, so the editor
+    // can be dropped into a pane whose height the layout decides.
+    fill = false,
+    readonly = false,
     label = '',
     describedBy = undefined,
     spellcheck = false
@@ -38,12 +42,13 @@
   }
 </script>
 
-<div class="code" style:--rows={rows}>
+<div class="code" class:fill style:--rows={rows}>
   <pre class="paint" bind:this={view} aria-hidden="true"><code>{@html painted}</code></pre>
   <textarea
     bind:value
     onscroll={syncScroll}
     onkeydown={onKeydown}
+    {readonly}
     aria-label={label}
     aria-describedby={describedBy}
     {spellcheck}
@@ -58,11 +63,13 @@
   .code {
     position: relative;
     height: calc(var(--rows) * 1.55em + 20px);
+    min-height: 0;
     border: 1px solid var(--border);
     border-radius: 6px;
     background: var(--bg);
     overflow: hidden;
   }
+  .code.fill { height: 100%; }
 
   /* Both layers must agree on every metric that moves a glyph. */
   .paint,

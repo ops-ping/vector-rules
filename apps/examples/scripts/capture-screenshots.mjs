@@ -24,19 +24,25 @@ async function retype(page, selector, text) {
   await page.type(selector, text);
 }
 
-/** Replace the contents of the code editor inside the open pop-out. */
+/** Replace the contents of the editor in the input pane. */
+const INPUT_EDITOR = '.panes > .pane:first-child textarea';
 async function retypeEditor(page, text) {
-  await page.click('.popout textarea');
+  await page.click(INPUT_EDITOR);
   await page.keyboard.down('Control');
   await page.keyboard.press('KeyA');
   await page.keyboard.up('Control');
   await page.keyboard.press('Backspace');
-  await page.type('.popout textarea', text);
+  await page.type(INPUT_EDITOR, text);
 }
 
-async function openPanel(page, panel) {
-  await page.click(`.tabs button[data-panel="${panel}"]`);
-  await page.waitForSelector('.popout', { timeout: 5000 });
+async function openTab(page, panel) {
+  const tab = `.pane-tabs button[data-panel="${panel}"]`;
+  await page.click(tab);
+  await page.waitForFunction(
+    (sel) => document.querySelector(sel)?.getAttribute('aria-selected') === 'true',
+    { timeout: 5000 },
+    tab
+  );
 }
 
 const firedCount = (page) => page.$$eval('.step.fired', (els) => els.length);
@@ -71,12 +77,12 @@ const targets = [
     // The editable bench, driven entirely from seeded vectors: proves the page
     // stays inert until Run, that the trace is the engine's and not a canned
     // script, and that the parameter and the input-facts JSON are one value.
-    expect: ['.trace[data-state="populated"]', '.popout', '.step.fired'],
+    expect: ['.trace[data-state="populated"]', '.step.fired', '.pane-tabs'],
     route: '#/semantic',
     output: resolve(repoRoot, 'docs/examples-semantic.png'),
-    viewport: { width: 1200, height: 900 },
+    viewport: { width: 1500, height: 1000 },
     prepare: async (page) => {
-      await page.waitForSelector('.tabs button[data-panel="rules"]', { timeout: 30000 });
+      await page.waitForSelector('.pane-tabs button[data-panel="rules"]', { timeout: 30000 });
       await page.waitForFunction(() => !document.querySelector('button.primary')?.disabled, {
         timeout: 30000
       });
@@ -86,20 +92,22 @@ const targets = [
       expectEqual(initial, 'empty', 'trace state before pressing Run');
       expectEqual(await firedCount(page), 0, 'rules fired before pressing Run');
 
-      // The default parameter is seeded, and the whole chain fires on it.
+      // The default parameter is seeded, and the whole chain fires on it: both
+      // measurements, the calibrated classification, and the decision.
       await runAndWait(page);
-      expectEqual(await firedCount(page), 3, 'rules fired for "queen"');
+      expectEqual(await firedCount(page), 4, 'rules fired for "queen"');
 
       // A different match string must genuinely change what fires: "tractor"
-      // scores far below the category threshold, so the chain stops at the
-      // measurement rule. A hard-coded trace could not do this.
+      // sits at the bottom of the calibration window, so both measurement rules
+      // still fire but the classification does not. A canned trace could not
+      // do this.
       await retype(page, '.param input', 'tractor');
       await runAndWait(page);
-      expectEqual(await firedCount(page), 1, 'rules fired for "tractor"');
+      expectEqual(await firedCount(page), 2, 'rules fired for "tractor"');
 
       // The parameter wrote through to the facts...
-      await openPanel(page, 'facts');
-      const facts = await page.$eval('.popout textarea', (el) => el.value);
+      await openTab(page, 'facts');
+      const facts = await page.$eval(INPUT_EDITOR, (el) => el.value);
       if (!facts.includes('"tractor"')) {
         throw new Error(`input facts did not follow the parameter: ${facts}`);
       }
@@ -110,12 +118,18 @@ const targets = [
         () => document.querySelector('.param input')?.value === 'queen',
         { timeout: 5000 }
       );
-      await page.click('.popout .close');
       await runAndWait(page);
-      expectEqual(await firedCount(page), 3, 'rules fired after editing the facts JSON');
+      expectEqual(await firedCount(page), 4, 'rules fired after editing the facts JSON');
 
-      // Capture with the rules open: the GRL that ran, beside the trace of it.
-      await openPanel(page, 'rules');
+      // The fitted geometry is an editable input too, not hidden machinery.
+      await openTab(page, 'axes');
+      const axes = await page.$eval(INPUT_EDITOR, (el) => el.value);
+      if (!axes.includes('calibration')) {
+        throw new Error(`axis pane did not show the calibration window: ${axes.slice(0, 120)}`);
+      }
+
+      // Capture in its resting state: the GRL that ran, beside the trace of it.
+      await openTab(page, 'rules');
       await pause(600);
     }
   },
@@ -123,10 +137,10 @@ const targets = [
     id: 'semantic-dynamic',
     // Free-form input is the claim that cannot be faked with a seeded corpus:
     // an unseeded match string must pull the real model and compute a vector.
-    expect: ['.chip[data-source="computed"]', '.trace[data-state="populated"]', '.popout'],
+    expect: ['.chip[data-source="computed"]', '.trace[data-state="populated"]'],
     route: '#/semantic',
     output: resolve(repoRoot, 'docs/examples-semantic-dynamic.png'),
-    viewport: { width: 1200, height: 900 },
+    viewport: { width: 1500, height: 1000 },
     allowModelDownload: true,
     // A free-form phrase, deliberately absent from the seed corpus, so the
     // bucket misses for exactly this text and nothing else. It scores 0.86
@@ -153,10 +167,10 @@ const targets = [
       if (!computed.some((text) => text.startsWith('royal woman'))) {
         throw new Error(`"royal woman" was not computed in-browser; chips: ${JSON.stringify(computed)}`);
       }
-      expectEqual(await firedCount(page), 3, 'rules fired for the computed vector');
+      expectEqual(await firedCount(page), 4, 'rules fired for the computed vector');
 
       // Capture with the derived facts open — they exist only after a run.
-      await openPanel(page, 'output');
+      await openTab(page, 'output');
       await pause(600);
     }
   },
@@ -316,9 +330,13 @@ async function main() {
         problems.push(`prepare failed: ${err.message}`);
       }
 
-      const section = await page.$('main section.stage');
+      // Frame the example itself rather than the stage around it: each card
+      // caps its own width, so shooting the stage would pad the image with
+      // however much room the shell happened to give it.
+      const section =
+        (await page.$('main section.stage > *')) ?? (await page.$('main section.stage'));
       if (!section) {
-        problems.push('could not find main section.stage');
+        problems.push('could not find the example card in main section.stage');
       } else {
         console.log(`Saving screenshot to ${t.output}...`);
         await section.screenshot({ path: t.output, type: 'png' });
