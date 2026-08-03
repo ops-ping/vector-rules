@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# commit-msg hook: strips Co-authored-by trailers before they can enter history.
+# GitHub attributes contributor credit off this trailer and never forgets it once
+# pushed, so this removes it unconditionally rather than trusting anything
+# upstream (human or AI) to omit it correctly every time.
+set -euo pipefail
+
+msg_file="$1"
+
+if grep -qiE '^co-authored-by:' "$msg_file"; then
+  grep -viE '^co-authored-by:' "$msg_file" > "$msg_file.tmp"
+  mv "$msg_file.tmp" "$msg_file"
+  echo "commit-msg hook: stripped Co-authored-by trailer(s) from commit message" >&2
+fi
