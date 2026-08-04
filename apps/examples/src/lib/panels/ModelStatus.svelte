@@ -21,7 +21,17 @@
   let active = $derived(model.phase === 'downloading' || model.phase === 'preparing');
 </script>
 
-<div class="model" class:active class:ready={model.phase === 'ready'} class:failed={model.phase === 'error'}>
+<!-- Transfer state is exposed as data attributes so automation can wait on
+     observable progress instead of guessing a wall-clock timeout. -->
+<div
+  class="model"
+  class:active
+  class:ready={model.phase === 'ready'}
+  class:failed={model.phase === 'error'}
+  data-phase={model.phase}
+  data-loaded={model.loaded}
+  data-total={model.total}
+>
   {#if model.phase === 'absent'}
     <span class="dot" aria-hidden="true"></span>
     <span>

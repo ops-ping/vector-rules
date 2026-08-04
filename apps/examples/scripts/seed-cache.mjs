@@ -39,22 +39,57 @@ const OUT_DIR = path.join(APP, 'public/vrules-rest/v1/embeddings', manifest.name
 // src/lib/examples/{Semantic,FraudTriage}.svelte; drift only causes a cache
 // miss (graceful fallback to in-browser compute), never wrong output.
 const CORPUS = [
-  // Semantic.svelte: the analogy operands and default match string its rules
-  // start with, plus alternatives worth trying without paying for the model.
-  'royalty', 'king', 'queen', 'man', 'woman', 'princess', 'banana', 'tractor',
-  'duchess', 'empress', 'monarch',
-  // Semantic.svelte: royalty axis, positive exemplars (king and queen too)
-  'emperor', 'the royal court', 'a reigning sovereign',
-  // Semantic.svelte: royalty axis, negative exemplars (tractor too)
-  'diesel engine', 'factory machine', 'wrench', 'conveyor belt', 'warehouse pallet',
-  // Semantic.svelte: the axis calibration window. A percentile is only as
-  // portable as the population it is measured against, so this is a spread of
-  // ordinary language with enough royal usage to grade the top of the scale.
-  'bread', 'river', 'accountant', 'sneakers', 'thunderstorm', 'library',
-  'bicycle', 'coffee', 'hospital', 'guitar', 'harvest', 'passport',
-  'castle', 'parliament', 'a noble family', 'the president', 'a mayor', 'a knight',
-  'an ancient throne', 'the crown jewels', 'a coronation', 'royal decree',
-  'the palace guard', 'an imperial dynasty',
+  // Semantic.svelte — royal proclamations. Mirrors DEFAULT_RULES/AXES there.
+  // Analogy operands, and speakers worth trying as the parameter.
+  'king', 'man', 'woman', 'queen', 'Elizabeth I of England', 'Queen Victoria',
+  'Henry VIII', 'a duke', 'the mayor', 'tractor',
+  // sovereign_voice axis — positive exemplars
+  'We hereby decree, by Our sovereign authority, that it shall be so',
+  'By royal command, let it be proclaimed throughout the realm',
+  'It is Our will that this matter be settled before the coming feast',
+  'We, by the grace of God, Queen of these lands, do declare',
+  'Let the herald announce Our judgement to every province',
+  // sovereign_voice axis — negative exemplars
+  'hey can you send me that file when you get a sec',
+  'please find attached the monthly invoice for your records',
+  'just following up on my last email about the meeting',
+  'thanks for the update, looks good to me',
+  'can we move the standup to 10 tomorrow',
+  // displeasure axis — positive exemplars
+  'We are gravely displeased and this failure shall not go unanswered',
+  'this is unacceptable and there will be consequences for it',
+  'you have failed us, and we shall remember who was responsible',
+  'our patience is exhausted; answer for this at once',
+  'we are bitterly disappointed by what has been allowed to happen',
+  // displeasure axis — negative exemplars
+  'We are delighted, and offer Our warmest thanks for your service',
+  'this is excellent work and we are grateful for the effort',
+  'thank you kindly, we are pleased with how this was handled',
+  'wonderful news, well done to everyone involved',
+  'we are content, and commend all who took part',
+  // Shared calibration window: both registers and both intents, because a
+  // percentile is only as portable as the population it is measured against.
+  'We hereby decree that the harvest tax is reduced this season',
+  'By Our command the gates shall open at dawn',
+  'please could you review the attached draft',
+  'the meeting notes are in the shared folder',
+  'we are gravely displeased with this dereliction',
+  'this is completely unacceptable and must be answered for',
+  'we are delighted with the outcome, thank you',
+  'great work everyone, really pleased with this',
+  'the quarterly numbers are attached for your review',
+  'let it be known that Our judgement is final',
+  'sorry for the delay, been swamped this week',
+  'We commend the loyal service of Our subjects',
+  'can you confirm receipt of the shipment',
+  'your continued failure has exhausted Our patience',
+  'thanks, that clears it up nicely',
+  'the maintenance window is scheduled for Sunday',
+  // Messages the example and its verification run assert on.
+  'We are gravely displeased by this betrayal, and Our judgement shall be swift',
+  'We hereby decree that the market shall be held on the first day of each month',
+  'this is completely unacceptable, someone needs to answer for it',
+  'thanks for sorting that out, much appreciated',
   // FraudTriage URGENT_EXEMPLARS
   'urgent wire transfer needed immediately or we face penalty',
   'the ceo needs this payment today, keep it confidential',

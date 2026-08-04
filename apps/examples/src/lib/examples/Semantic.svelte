@@ -11,59 +11,144 @@
   import { embedText, probeVectorSource, subscribeModel } from '../embed.js';
   import { splitRules, pathsRead, pathsAssigned, vectorInputs } from '../syntax.js';
   import CodeEditor from '../panels/CodeEditor.svelte';
+  import Disclosure from '../panels/Disclosure.svelte';
 
-  // `s_` scores are measurements and carry no portable meaning — a cosine of
-  // 0.80 means something different on every model — so the decision is made on
-  // `c_project`, a percentile against a calibration window. That is the whole
-  // reason the vocabulary distinguishes the two kinds.
-  const DEFAULT_RULES = `rule "MeasureAnalogy" salience 100 no-loop {
+  // Royal proclamations. A message is scored on two independent calibrated
+  // axes — is this a sovereign speaking, and is the intent punitive — and the
+  // response falls out of the 2x2. Both axes separate cleanly on this model and
+  // are near-orthogonal (cosine 0.136 between their directions), so they are
+  // genuinely two questions rather than one signal under two names.
+  //
+  // `s_cosine` stays a measurement and gates nothing: it identifies the speaker
+  // via inline vector algebra, and generalises to regnal names it was never
+  // shown (Elizabeth I of England 0.72, Queen Victoria 0.75, against the mayor
+  // 0.65 and tractor 0.62). The decisions are made on `c_project`, whose
+  // percentile means the same thing on any model.
+  const DEFAULT_RULES = `rule "IdentifySpeaker" no-loop {
     when
-        Concept.target != ""
+        Message.speaker != ""
     then
-        Concept.analogy = s_cosine(
+        Message.queenlike = s_cosine(
             ["v:add", ["v:sub", "king", "man"], "woman"],
-            Concept.target);
+            Message.speaker);
 }
 
-rule "MeasureRoyalty" salience 90 no-loop {
+rule "MeasureVoice" no-loop {
     when
-        Concept.target != ""
+        Message.text != ""
     then
-        Concept.royal_pct = c_project(Concept.target, "royalty");
+        Message.voice_pct =
+            c_project(Message.text, "sovereign_voice");
+}
+
+rule "MeasureIntent" no-loop {
+    when
+        Message.text != ""
+    then
+        Message.displeasure_pct =
+            c_project(Message.text, "displeasure");
 }
 
 // c_project is calibrated, so it may be thresholded here in \`when\`.
 // s_cosine may not: the lint rejects thresholding a raw scalar.
-rule "ClassifyRoyal" salience 50 no-loop {
+rule "FallOnSword" no-loop {
     when
-        Concept.royal_pct > 75
+        Message.voice_pct > 60 && Message.displeasure_pct > 75
     then
-        Concept.category = "royalty";
+        Message.verdict = "sovereign displeasure";
+        Decision.response = "fall on your sword";
 }
 
-rule "GrantRoyalAccess" no-loop {
+rule "Apologise" no-loop {
     when
-        Concept.category == "royalty"
+        Message.voice_pct <= 60 && Message.displeasure_pct > 75
     then
-        Decision.access_granted = true;
+        Message.verdict = "displeasure, but not from the throne";
+        Decision.response = "apologise";
+}
+
+rule "Acknowledge" no-loop {
+    when
+        Message.displeasure_pct <= 75
+    then
+        Message.verdict = "no displeasure";
+        Decision.response = "acknowledge";
 }`;
 
   const DEFAULT_FACTS = `{
-  "Concept": {
-    "target": "queen"
+  "Message": {
+    "speaker": "queen",
+    "text": "We are gravely displeased by this betrayal, and Our judgement shall be swift"
   }
 }`;
 
   const DEFAULT_AXES = `{
-  "royalty": {
-    "positive": ["king", "queen", "monarch", "emperor", "the royal court", "a reigning sovereign"],
-    "negative": ["tractor", "diesel engine", "factory machine", "wrench", "conveyor belt", "warehouse pallet"],
+  "sovereign_voice": {
+    "positive": [
+      "We hereby decree, by Our sovereign authority, that it shall be so",
+      "By royal command, let it be proclaimed throughout the realm",
+      "It is Our will that this matter be settled before the coming feast",
+      "We, by the grace of God, Queen of these lands, do declare",
+      "Let the herald announce Our judgement to every province"
+    ],
+    "negative": [
+      "hey can you send me that file when you get a sec",
+      "please find attached the monthly invoice for your records",
+      "just following up on my last email about the meeting",
+      "thanks for the update, looks good to me",
+      "can we move the standup to 10 tomorrow"
+    ],
     "calibration": [
-      "bread", "river", "accountant", "sneakers", "thunderstorm", "library",
-      "bicycle", "coffee", "hospital", "guitar", "harvest", "passport",
-      "castle", "parliament", "a noble family", "the president", "a mayor", "a knight",
-      "an ancient throne", "the crown jewels", "a coronation", "royal decree",
-      "the palace guard", "an imperial dynasty"
+      "We hereby decree that the harvest tax is reduced this season",
+      "By Our command the gates shall open at dawn",
+      "please could you review the attached draft",
+      "the meeting notes are in the shared folder",
+      "we are gravely displeased with this dereliction",
+      "this is completely unacceptable and must be answered for",
+      "we are delighted with the outcome, thank you",
+      "great work everyone, really pleased with this",
+      "the quarterly numbers are attached for your review",
+      "let it be known that Our judgement is final",
+      "sorry for the delay, been swamped this week",
+      "We commend the loyal service of Our subjects",
+      "can you confirm receipt of the shipment",
+      "your continued failure has exhausted Our patience",
+      "thanks, that clears it up nicely",
+      "the maintenance window is scheduled for Sunday"
+    ]
+  },
+  "displeasure": {
+    "positive": [
+      "We are gravely displeased and this failure shall not go unanswered",
+      "this is unacceptable and there will be consequences for it",
+      "you have failed us, and we shall remember who was responsible",
+      "our patience is exhausted; answer for this at once",
+      "we are bitterly disappointed by what has been allowed to happen"
+    ],
+    "negative": [
+      "We are delighted, and offer Our warmest thanks for your service",
+      "this is excellent work and we are grateful for the effort",
+      "thank you kindly, we are pleased with how this was handled",
+      "wonderful news, well done to everyone involved",
+      "we are content, and commend all who took part"
+    ],
+    "calibration": [
+      "We hereby decree that the harvest tax is reduced this season",
+      "By Our command the gates shall open at dawn",
+      "please could you review the attached draft",
+      "the meeting notes are in the shared folder",
+      "we are gravely displeased with this dereliction",
+      "this is completely unacceptable and must be answered for",
+      "we are delighted with the outcome, thank you",
+      "great work everyone, really pleased with this",
+      "the quarterly numbers are attached for your review",
+      "let it be known that Our judgement is final",
+      "sorry for the delay, been swamped this week",
+      "We commend the loyal service of Our subjects",
+      "can you confirm receipt of the shipment",
+      "your continued failure has exhausted Our patience",
+      "thanks, that clears it up nicely",
+      "the maintenance window is scheduled for Sunday"
     ]
   }
 }`;
@@ -77,16 +162,21 @@ rule "GrantRoyalAccess" no-loop {
   let rulesText = $state(DEFAULT_RULES);
   let factsText = $state(DEFAULT_FACTS);
   let axesText = $state(DEFAULT_AXES);
-  let matchText = $state('queen');
-  let inputTab = $state('rules'); // 'rules' | 'facts' | 'axes'
-  let outputTab = $state('trace'); // 'trace' | 'facts'
   let result = $state(null);
   let busy = $state(false);
   let status = $state('');
   let error = $state('');
   let ready = $state(false);
-  let vectorSource = $state('');
   let modelPhase = $state('absent');
+  let outputTab = $state('trace'); // 'trace' | 'facts'
+  // Where each parameter's vector would come from, keyed by its text.
+  let sources = $state({});
+
+  // Input sections are independent and all start closed, so the bench opens on
+  // its result rather than on three stacked editors.
+  let showRules = $state(false);
+  let showFacts = $state(false);
+  let showAxes = $state(false);
 
   let initPromise;
   function ensureWasm() {
@@ -147,8 +237,7 @@ rule "GrantRoyalAccess" no-loop {
     }
     const axes = [];
     for (const [name, spec] of Object.entries(parsed)) {
-      const sets = ['positive', 'negative', 'calibration'];
-      for (const set of sets) {
+      for (const set of ['positive', 'negative', 'calibration']) {
         if (!Array.isArray(spec?.[set]) || !spec[set].every((t) => typeof t === 'string')) {
           return { ok: false, message: `axis "${name}" needs a "${set}" array of strings` };
         }
@@ -173,9 +262,8 @@ rule "GrantRoyalAccess" no-loop {
   let axesCheck = $derived(checkAxes(axesText));
   let rulesCheck = $derived(checkRules(rulesText));
   let rules = $derived(splitRules(rulesText));
-  // The match string is whichever fact field the rules feed into vector math.
-  let matchPath = $derived(vectorInputs(rulesText).paths[0] ?? '');
   let runnable = $derived(ready && factsCheck.ok && axesCheck.ok && rulesCheck.ok);
+  let anyInputOpen = $derived(showRules || showFacts || showAxes);
 
   function factValue(facts, path) {
     const [type, field] = path.split('.');
@@ -183,44 +271,38 @@ rule "GrantRoyalAccess" no-loop {
     return value === undefined ? null : value;
   }
 
-  function boundMatch(check, path) {
-    if (!check.ok || !path) return null;
-    const [type, field] = path.split('.');
-    if (type !== check.type) return null;
-    const value = check.body[field];
-    return typeof value === 'string' ? value : null;
-  }
+  // Every fact field the rules feed into vector math becomes an editable
+  // parameter. The facts JSON stays the single source of truth — each input
+  // reads its value straight out of it, so the two cannot drift apart.
+  let params = $derived(
+    factsCheck.ok
+      ? vectorInputs(rulesText)
+          .paths.filter((path) => path.startsWith(`${factsCheck.type}.`))
+          .map((path) => ({ path, field: path.split('.')[1] }))
+          .filter(({ field }) => typeof factsCheck.body[field] === 'string')
+          .map((p) => ({ ...p, value: factsCheck.body[p.field] }))
+      : []
+  );
 
-  // The parameter and the input facts are two views of one value. Editing the
-  // facts pulls the parameter along; typing the parameter patches the facts.
-  $effect(() => {
-    const bound = boundMatch(factsCheck, matchPath);
-    if (bound !== null && bound !== matchText) matchText = bound;
-  });
-
-  function onMatchInput(event) {
-    matchText = event.currentTarget.value;
-    if (!factsCheck.ok || !matchPath) return;
-    const [type, field] = matchPath.split('.');
-    if (type !== factsCheck.type) return;
+  function onParamInput(field, value) {
+    if (!factsCheck.ok) return;
     const next = JSON.parse(factsText);
-    next[type][field] = matchText;
+    next[factsCheck.type][field] = value;
     factsText = JSON.stringify(next, null, 2);
   }
 
-  // Whether running will read a file or download the model, answered before the
-  // run rather than discovered during it.
+  // Whether running will read a file or download the model, answered per
+  // parameter before the run rather than discovered during it.
   $effect(() => {
-    const text = matchText;
-    if (!text) {
-      vectorSource = '';
-      return;
-    }
+    const texts = params.map((p) => p.value).filter(Boolean);
     let live = true;
     const timer = setTimeout(async () => {
-      const source = await probeVectorSource(text).catch(() => '');
-      if (live) vectorSource = source;
-    }, 200);
+      const found = {};
+      for (const text of texts) {
+        found[text] = await probeVectorSource(text).catch(() => '');
+      }
+      if (live) sources = found;
+    }, 250);
     return () => {
       live = false;
       clearTimeout(timer);
@@ -261,8 +343,8 @@ rule "GrantRoyalAccess" no-loop {
     const { literals, paths } = vectorInputs(rulesText);
     const texts = new Set(literals);
     for (const path of paths) {
-      const value = boundMatch(facts, path);
-      if (value) texts.add(value);
+      const value = factValue({ [facts.type]: facts.body }, path);
+      if (typeof value === 'string' && value) texts.add(value);
     }
     // An axis is fitted from its exemplars' vectors, so they are inputs too.
     for (const axis of axes.axes ?? []) {
@@ -375,7 +457,9 @@ rule "GrantRoyalAccess" no-loop {
         // Only the interesting vectors are itemized: whatever was computed
         // here, plus the match string. A calibration window is 24 chips of
         // noise otherwise.
-        chips: vectors.filter((v) => v.source === 'computed' || v.text === matchText),
+        chips: vectors.filter(
+          (v) => v.source === 'computed' || params.some((p) => p.value === v.text)
+        ),
         dimensions: vectors[0]?.dimensions ?? null
       };
       outputTab = 'trace';
@@ -412,99 +496,104 @@ rule "GrantRoyalAccess" no-loop {
     computed: 'computed by EmbeddingGemma in this tab'
   };
 
-  let matchNote = $derived(
-    vectorSource === 'compute'
-      ? modelPhase === 'ready'
-        ? 'not cached — computed in this tab by the loaded model'
-        : 'not cached — running downloads EmbeddingGemma (236 MB), once'
-      : vectorSource
-        ? `${SOURCE_LABEL[vectorSource]} — no model download`
-        : ''
-  );
-
-  let inputFoot = $derived(
-    inputTab === 'rules'
-      ? rulesCheck.ok
-        ? `parses — ${rules.length} rule${rules.length === 1 ? '' : 's'}, checked by the engine's own parser as you type`
-        : rulesCheck.message
-      : inputTab === 'facts'
-        ? factsCheck.ok
-          ? `asserts one ${factsCheck.type} fact; the engine adds an empty Decision fact alongside it`
-          : factsCheck.message
-        : axesCheck.ok
-          ? `${axesCheck.axes.length} axis fitted from its exemplars each run; c_project scores a percentile against the calibration window`
-          : axesCheck.message
-  );
-  let inputBad = $derived(
-    inputTab === 'rules' ? !rulesCheck.ok : inputTab === 'facts' ? !factsCheck.ok : !axesCheck.ok
-  );
+  function sourceNote(text) {
+    const source = sources[text];
+    if (source === 'compute') {
+      return modelPhase === 'ready'
+        ? 'not cached — computed in this tab'
+        : 'not cached — running downloads EmbeddingGemma (236 MB), once';
+    }
+    return source ? `${SOURCE_LABEL[source]} — no model download` : '';
+  }
 </script>
 
 <section class="bench">
   <div class="head-row">
-    <h3>Semantic vector rules — editable, in the browser</h3>
+    <h3>Royal proclamations — editable, in the browser</h3>
     <button class="primary" onclick={run} disabled={busy || !runnable}>
       {busy ? 'running…' : '▶ Run'}
     </button>
   </div>
   <p class="muted lede">
-    Rules, facts and fitted geometry on the left; what the engine did with them on the right.
-    All three are yours to edit. Vector functions carry their return kind — <code>s_</code> raw
-    scalar (a measurement, never thresholded), <code>c_</code> calibrated (thresholdable),
-    <code>b_</code> boolean, <code>m_</code> metadata — so the analogy score is reported and
-    the decision is made on a calibration percentile.
+    A message is scored on two independent calibrated axes — is a sovereign speaking, and is
+    the intent punitive — and the response falls out of the 2×2. Rules, facts and fitted
+    geometry on the left are all yours to edit. Vector functions carry their return kind:
+    <code>s_</code> raw scalar identifies the speaker through inline vector algebra and gates
+    nothing, because a cosine means something different on every model; <code>c_</code>
+    calibrated makes the decisions, because a percentile against a calibration window does not.
   </p>
 
   <div class="controls">
-    <label class="param">
-      <span>match string {#if matchPath}<code>{matchPath}</code>{/if}</span>
-      <input
-        value={matchText}
-        oninput={onMatchInput}
-        disabled={!matchPath}
-        spellcheck="false"
-        autocomplete="off"
-        placeholder={matchPath ? 'queen' : 'no fact field is passed to a vector function'}
-      />
-    </label>
-    {#if matchPath}
-      <span class="src" data-source={vectorSource} class:warn={vectorSource === 'compute'}>
-        {matchNote}
-      </span>
+    {#each params as param (param.path)}
+      <label class="param">
+        <span>{param.field} <code>{param.path}</code></span>
+        <input
+          value={param.value}
+          oninput={(e) => onParamInput(param.field, e.currentTarget.value)}
+          spellcheck="false"
+          autocomplete="off"
+          data-param={param.field}
+        />
+        <span
+          class="src"
+          data-source={sources[param.value] ?? ''}
+          class:warn={sources[param.value] === 'compute'}
+        >{sourceNote(param.value)}</span>
+      </label>
     {:else}
       <span class="src">the rules pass no fact field to a vector function — edit the input facts directly</span>
-    {/if}
+    {/each}
   </div>
 
   <!-- Height is reserved so a run's progress never shifts the panes below it. -->
   <div class="status-row" class:bad={!!error}>{error || status}</div>
 
-  <div class="panes">
-    <div class="pane">
-      <div class="pane-tabs" role="tablist" aria-label="Engine input">
-        <button role="tab" aria-selected={inputTab === 'rules'} class:on={inputTab === 'rules'}
-          onclick={() => (inputTab = 'rules')} data-panel="rules">
-          Rules <span class="count" class:bad={!rulesCheck.ok}>{rules.length} GRL</span>
-        </button>
-        <button role="tab" aria-selected={inputTab === 'facts'} class:on={inputTab === 'facts'}
-          onclick={() => (inputTab = 'facts')} data-panel="facts">
-          Input facts <span class="count" class:bad={!factsCheck.ok}>{factsCheck.ok ? factsCheck.type : 'invalid'}</span>
-        </button>
-        <button role="tab" aria-selected={inputTab === 'axes'} class:on={inputTab === 'axes'}
-          onclick={() => (inputTab = 'axes')} data-panel="axes">
-          Axes <span class="count" class:bad={!axesCheck.ok}>{axesCheck.ok ? `${axesCheck.axes.length} fitted` : 'invalid'}</span>
-        </button>
-      </div>
-      <div class="pane-body">
-        {#if inputTab === 'rules'}
-          <CodeEditor bind:value={rulesText} lang="grl" fill label="Rules, GRL source" />
-        {:else if inputTab === 'facts'}
-          <CodeEditor bind:value={factsText} lang="json" fill label="Input facts, JSON" />
-        {:else}
-          <CodeEditor bind:value={axesText} lang="json" fill label="Axis exemplars, JSON" />
-        {/if}
-      </div>
-      <div class="foot" class:bad={inputBad}>{inputFoot}</div>
+  <div class="panes" class:split={anyInputOpen}>
+    <div class="pane inputs">
+      <Disclosure
+        label="Rules"
+        badge="{rules.length} GRL"
+        bad={!rulesCheck.ok}
+        panel="rules"
+        bind:open={showRules}
+      >
+        <CodeEditor bind:value={rulesText} lang="grl" rows={18} label="Rules, GRL source" />
+        <div class="foot" class:bad={!rulesCheck.ok}>
+          {rulesCheck.ok
+            ? `parses — ${rules.length} rule${rules.length === 1 ? '' : 's'}, checked by the engine's own parser as you type`
+            : rulesCheck.message}
+        </div>
+      </Disclosure>
+
+      <Disclosure
+        label="Input facts"
+        badge={factsCheck.ok ? factsCheck.type : 'invalid'}
+        bad={!factsCheck.ok}
+        panel="facts"
+        bind:open={showFacts}
+      >
+        <CodeEditor bind:value={factsText} lang="json" rows={8} label="Input facts, JSON" />
+        <div class="foot" class:bad={!factsCheck.ok}>
+          {factsCheck.ok
+            ? `asserts one ${factsCheck.type} fact; the engine adds an empty Decision fact alongside it`
+            : factsCheck.message}
+        </div>
+      </Disclosure>
+
+      <Disclosure
+        label="Axes"
+        badge={axesCheck.ok ? `${axesCheck.axes.length} fitted` : 'invalid'}
+        bad={!axesCheck.ok}
+        panel="axes"
+        bind:open={showAxes}
+      >
+        <CodeEditor bind:value={axesText} lang="json" rows={14} label="Axis exemplars, JSON" />
+        <div class="foot" class:bad={!axesCheck.ok}>
+          {axesCheck.ok
+            ? `fitted from these exemplars each run; c_project scores a percentile against the calibration window`
+            : axesCheck.message}
+        </div>
+      </Disclosure>
     </div>
 
     <div class="pane">
@@ -609,22 +698,30 @@ rule "GrantRoyalAccess" no-loop {
   .head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
   .lede { max-width: 82ch; }
 
-  .controls { display: flex; align-items: flex-end; gap: 12px; margin: 12px 0 0; flex-wrap: wrap; }
-  .param { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--fg-muted); }
+  .controls { display: grid; gap: 10px; margin: 12px 0 0; }
+  @container (min-width: 46rem) {
+    .controls { grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr)); }
+  }
+  .param { display: grid; gap: 4px; font-size: 12px; color: var(--fg-muted); min-width: 0; }
   .param code { color: var(--fg-muted); }
-  .param input { width: min(18rem, 100%); font-family: var(--mono); }
-  .src { font-size: 11.5px; color: var(--fg-muted); padding-bottom: 7px; }
+  .param input { width: 100%; font-family: var(--mono); }
+  .src { font-size: 11.5px; color: var(--fg-muted); }
   .src.warn { color: var(--amber); }
 
   .status-row { min-height: 1.5em; font-size: 11.5px; color: var(--fg-muted); margin: 6px 0 8px; }
   .status-row.bad { color: var(--red); }
 
   .panes { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
-  /* Side by side only when the bench itself is wide enough for two columns of
-     code — a container query, so it holds inside any shell. */
+  /* Side by side only when an input section is open AND the bench itself is
+     wide enough for two columns of code — a container query, so it holds
+     inside any shell. */
   @container (min-width: 60rem) {
-    .panes { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .panes.split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   }
+
+  /* The input column is a stack of self-contained sections, so it carries no
+     frame of its own. */
+  .pane.inputs { display: grid; gap: 8px; align-content: start; border: 0; padding: 0; background: none; }
 
   .pane {
     display: grid;
@@ -647,7 +744,6 @@ rule "GrantRoyalAccess" no-loop {
     font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em;
     color: var(--fg-muted); border-left: 1px solid var(--border); padding-left: 7px;
   }
-  .count.bad { color: var(--red); }
 
   .foot { font-size: 11px; color: var(--fg-muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .foot.bad { color: var(--red); font-family: var(--mono); }

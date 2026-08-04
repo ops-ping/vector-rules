@@ -71,7 +71,42 @@ function unquote(literal) {
 
 const FACT_PATH = /\b[A-Z][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*\b/g;
 const STRING_LITERAL = /"(?:[^"\\]|\\.)*"/g;
-const VECTOR_CALL = /\b[scbm]_[A-Za-z_][A-Za-z0-9_]*\s*\(/g;
+const VECTOR_CALL = /\b([scbm]_[A-Za-z_][A-Za-z0-9_]*)\s*\(/g;
+
+// Argument slots that name a fitted artifact or a canon label rather than text
+// to embed, by zero-based position. Collecting one of these is not merely
+// wasteful: the name is almost never in the seeded cache, so resolving it
+// downloads the 236 MB model to vectorize a string the engine never asks for.
+//
+// Erring the other way is safe. Anything missed here surfaces as the engine's
+// own "no prefetched embedding" error, which the caller resolves and retries —
+// so this table only has to be conservative, never exhaustive.
+const ARTIFACT_ARG = {
+  s_project: 1,
+  c_project: 1,
+  s_depth: 1,
+  b_member: 1,
+  s_canon_match: 1,
+  b_canon_matches: 1
+};
+
+/** Split a call's argument list into `[start, end)` spans at top-level commas. */
+function argumentSpans(masked, from, to) {
+  const spans = [];
+  let depth = 0;
+  let start = from;
+  for (let i = from; i < to; i++) {
+    const ch = masked[i];
+    if (ch === '(' || ch === '[' || ch === '{') depth += 1;
+    else if (ch === ')' || ch === ']' || ch === '}') depth -= 1;
+    else if (ch === ',' && depth === 0) {
+      spans.push([start, i]);
+      start = i + 1;
+    }
+  }
+  spans.push([start, to]);
+  return spans;
+}
 
 /**
  * Split GRL source into its rules, keeping each rule's `when` and `then` text
@@ -135,17 +170,24 @@ export function vectorInputs(source) {
   let call;
   VECTOR_CALL.lastIndex = 0;
   while ((call = VECTOR_CALL.exec(masked))) {
+    const name = call[1];
     const open = VECTOR_CALL.lastIndex - 1;
     const close = matchBracket(masked, open);
     // Rescan from just inside the call so nested vector calls are found too.
     VECTOR_CALL.lastIndex = open + 1;
     if (close < 0) continue;
-    const args = source.slice(open + 1, close);
-    for (const literal of args.match(STRING_LITERAL) || []) {
-      const text = unquote(literal);
-      if (!/^[vc]:/.test(text)) literals.add(text);
-    }
-    for (const path of args.match(FACT_PATH) || []) paths.add(path);
+
+    const artifactSlot = ARTIFACT_ARG[name];
+    argumentSpans(masked, open + 1, close).forEach(([from, to], index) => {
+      if (index === artifactSlot) return;
+      const arg = source.slice(from, to);
+      for (const literal of arg.match(STRING_LITERAL) || []) {
+        const text = unquote(literal);
+        // `v:`/`c:` heads are Lisp operators, not text.
+        if (!/^[vc]:/.test(text)) literals.add(text);
+      }
+      for (const path of arg.match(FACT_PATH) || []) paths.add(path);
+    });
   }
   return { literals: [...literals], paths: [...paths] };
 }

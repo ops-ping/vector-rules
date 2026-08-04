@@ -4,6 +4,8 @@
   import { onMount } from 'svelte';
   import init, { prove } from 'vrules-wasm/vrules_wasm.js';
   import wasmUrl from 'vrules-wasm/vrules_wasm_bg.wasm?url';
+  import CodeEditor from '../panels/CodeEditor.svelte';
+  import Disclosure from '../panels/Disclosure.svelte';
 
   // Multi-tiered e-commerce approval flow: ApproveOrder depends on FundsAvailable & RiskIsLow
   let grl = $state(`rule "CheckFunds" {
@@ -34,6 +36,21 @@ rule "ApproveOrder" {
 }`);
 
   let factsText = $state('{ "Order.Amount": 50, "Account.Balance": 100, "Account.AgeDays": 45 }');
+
+  // Inputs stay collapsed until asked for, so the proof tree is what the
+  // example opens on.
+  let showGrl = $state(false);
+  let showQuery = $state(false);
+  let showFacts = $state(false);
+
+  let factsValid = $derived.by(() => {
+    try {
+      JSON.parse(factsText);
+      return true;
+    } catch {
+      return false;
+    }
+  });
 
   let result = $state(null);
   let error = $state('');
@@ -84,11 +101,23 @@ rule "ApproveOrder" {
     {#if status}<span class="status">— {status}</span>{/if}
   </p>
 
-  <div class="cols">
-    <label class="col">GRL Knowledge Base<textarea rows="8" bind:value={grl}></textarea></label>
-    <label class="col">Query Goal<textarea rows="8" bind:value={query}></textarea></label>
+  <div class="inputs">
+    <Disclosure label="Knowledge base" badge="GRL" panel="grl" bind:open={showGrl}>
+      <CodeEditor bind:value={grl} lang="grl" rows={12} label="GRL knowledge base" />
+    </Disclosure>
+    <Disclosure label="Query goal" badge="QUERY" panel="query" bind:open={showQuery}>
+      <CodeEditor bind:value={query} lang="grl" rows={8} label="Query goal" />
+    </Disclosure>
+    <Disclosure
+      label="Working facts"
+      badge={factsValid ? 'JSON' : 'invalid'}
+      bad={!factsValid}
+      panel="facts"
+      bind:open={showFacts}
+    >
+      <CodeEditor bind:value={factsText} lang="json" rows={5} label="Working facts, JSON" />
+    </Disclosure>
   </div>
-  <label>Working Facts (JSON)<input bind:value={factsText} /></label>
 
   {#if error}<div class="error">Error: {error}</div>{/if}
 
@@ -114,10 +143,7 @@ rule "ApproveOrder" {
   h3 { margin: 0 0 4px; font-size: 14px; }
   .muted { font-size: 12px; color: var(--fg-muted); }
   .head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-  .cols { display: flex; gap: 12px; margin: 10px 0; flex-wrap: wrap; }
-  .col { flex: 1; min-width: 240px; }
-  label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--fg-muted); margin: 6px 0; }
-  textarea, input { font-family: var(--mono, monospace); font-size: 11.5px; background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; }
+  .inputs { display: grid; gap: 8px; margin: 10px 0; }
   .status { color: var(--fg-muted); }
   .primary { font-size: 12px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--green, #22c55e); color: #fff; font-weight: 600; cursor: pointer; }
   .primary:hover:not(:disabled) { opacity: 0.9; }

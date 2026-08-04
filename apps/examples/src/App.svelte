@@ -1,10 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import AddressExample from './lib/examples/AddressExample.svelte';
-  import FraudTriage from './lib/examples/FraudTriage.svelte';
-  import Prove from './lib/examples/Prove.svelte';
   import Semantic from './lib/examples/Semantic.svelte';
-  import Streaming from './lib/examples/Streaming.svelte';
   import ModelStatus from './lib/panels/ModelStatus.svelte';
   import { getBackendInfo } from './lib/embed.js';
 
@@ -15,12 +11,17 @@
     gpu = await getBackendInfo();
   }
 
+  // Only examples whose verification asserts the values they compute are
+  // exposed. Address, Fraud triage, Streaming and Proof assert that an element
+  // rendered, not what it says, which is how Proof shipped rendering NOT
+  // PROVABLE against an empty proof tree. They return once their runs check
+  // their output — see issues #1 and #2.
   const examples = [
-    { id: 'semantic', label: 'Semantic rules', hint: 'an editable bench: vector algebra, calibrated decisions, forward chaining' },
-    { id: 'address', label: 'Address verification', hint: 'canonicalization, reference matching, and organizational policy' },
-    { id: 'fraud', label: 'Fraud triage', hint: 'fitted geometry artifacts + calibrated features + symbolic decisions' },
-    { id: 'streaming', label: 'Streaming', hint: 'incremental rules in browser WebAssembly' },
-    { id: 'prove', label: 'Proof', hint: 'goal-directed backward chaining' }
+    {
+      id: 'semantic',
+      label: 'Royal proclamations',
+      hint: 'an editable bench: vector algebra, two calibrated axes, forward chaining'
+    }
   ];
   const ids = new Set(examples.map((item) => item.id));
   const DEFAULT_EXAMPLE = examples[0].id;
@@ -77,31 +78,25 @@
   <ModelStatus />
 </header>
 
-<main>
-  <nav aria-label="Examples">
-    {#each examples as item}
-      <button
-        class:active={selected === item.id}
-        aria-current={selected === item.id ? 'page' : undefined}
-        onclick={() => navigate(item.id)}
-      >
-        <span class="nav-label">{item.label}</span>
-        <span class="nav-hint">{item.hint}</span>
-      </button>
-    {/each}
-  </nav>
+<main class:railed={examples.length > 1}>
+  {#if examples.length > 1}
+    <nav aria-label="Examples">
+      {#each examples as item}
+        <button
+          class:active={selected === item.id}
+          aria-current={selected === item.id ? 'page' : undefined}
+          onclick={() => navigate(item.id)}
+        >
+          <span class="nav-label">{item.label}</span>
+          <span class="nav-hint">{item.hint}</span>
+        </button>
+      {/each}
+    </nav>
+  {/if}
 
   <section class="stage">
-    {#if selected === 'address'}
-      <AddressExample />
-    {:else if selected === 'semantic'}
+    {#if selected === 'semantic'}
       <Semantic />
-    {:else if selected === 'fraud'}
-      <FraudTriage />
-    {:else if selected === 'streaming'}
-      <Streaming />
-    {:else if selected === 'prove'}
-      <Prove />
     {/if}
   </section>
 </main>
@@ -172,7 +167,7 @@
   nav button.active .nav-hint { color: var(--accent, #58a6ff); opacity: 0.75; }
 
   @media (min-width: 60rem) {
-    main { grid-template-columns: minmax(10rem, 15rem) minmax(0, 1fr); }
+    main.railed { grid-template-columns: minmax(10rem, 15rem) minmax(0, 1fr); }
     nav {
       position: sticky;
       top: 20px;

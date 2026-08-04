@@ -26,16 +26,22 @@ The model is stored in OPFS, so the download happens once per browser.
 
 ## Verifying the examples
 
-`npm run verify` builds the app, serves the built `dist/`, drives every example
-in headless Chrome, and captures the screenshots below. It fails the run on any
-uncaught exception, console error, failed request, missing expected selector, or
-a seeded-cache miss. Each target runs in its own browser context, so a vector
-one target caches cannot change what the next one reports.
+`npm run verify` builds the app, serves the built `dist/`, drives every enabled
+example in headless Chrome, and captures the screenshots below. It fails the run
+on any uncaught exception, console error, failed request, missing expected
+selector, or a seeded-cache miss. Each target runs in its own browser context, so
+a vector one target caches cannot change what the next one reports.
 
-The runs assert behavior, not just that a page rendered: that the bench executes
-nothing until Run is pressed, that changing the match string changes which rules
-fire, and that the parameter and the input-facts JSON stay two views of one
-value.
+A run has to assert the values an example computes, not that it rendered
+something. Counting elements is not verification: the Proof example rendered
+NOT PROVABLE against an empty proof tree while its check — that an output
+element existed — passed on every run, and it shipped that way. So the semantic
+runs assert the derived numbers (`Concept.analogy`, `Concept.register_pct` and
+the facts they chain into) for each input, and those numbers are corroborated
+against `llama-server` measurements of the same model rather than against the
+app itself. They also assert that nothing executes until Run is pressed, that
+changing the match string changes which rules fire, and that the parameter and
+the input-facts JSON stay two views of one value.
 
 A prepared input that triggers a model download also fails the run. That guard
 is what keeps `scripts/seed-cache.mjs` honest: the seed corpus mirrors string
@@ -55,69 +61,69 @@ npm run icons         # re-rasterize favicon.svg into the PNG/ICO fallbacks
 The captured screenshots double as the fallback imagery in this document for
 readers who cannot run the live site.
 
-## Semantic rules
+## Royal proclamations
 
-An editable bench for vector reasoning, and the example the site opens on.
-Rules, asserted facts and fitted geometry sit in the left pane; what the engine
-did with them sits in the right. All of it is input: the engine parses what is
-typed, resolves a vector for every text the rules and axes reference, fits the
-geometry, and evaluates. Nothing runs until Run is pressed, and the execution
-trace, the value each rule derived, and the output facts are read back from the
-engine's own result rather than described alongside it — editing a rule changes
-what the trace reports, because the trace is built from the source the engine
-parsed.
+An editable bench for vector reasoning, and the example the site opens on. A
+message is scored on two independent calibrated axes — is a sovereign speaking,
+and is the intent punitive — and the response falls out of the 2×2:
 
-The rules it starts with separate measuring from deciding, which is what the
-return-kind vocabulary is for. `s_` is a raw scalar — a measurement, never
-thresholded — so `s_cosine(["v:add", ["v:sub", "king", "man"], "woman"],
-Concept.target)` reports how near the target lands to the analogy point and
-nothing more; a cosine of 0.80 carries no portable meaning, because it means
-something different on every model. The decision is made on `c_project`, a
-calibrated percentile against a window fitted in the browser from the exemplars
-in the Axes pane, so `> 75` says "in the top quartile of the calibration
-window" on any model. Being calibrated, `c_project` may be thresholded directly
-in `when`; the load-time lint rejects doing that to a raw scalar.
+| | displeasure > 75 | displeasure ≤ 75 |
+| --- | --- | --- |
+| **voice > 60** | fall on your sword | acknowledge |
+| **voice ≤ 60** | apologise | acknowledge |
+
+Both axes separate cleanly on this model and their directions are near
+orthogonal (cosine 0.136), so they are two questions rather than one signal
+under two names. Measured through the bench: a displeased proclamation scores
+93.75 on both and falls on its sword; the same anger in plain language scores 50
+on voice and only apologises; a calm decree scores 75 on voice and 68.75 on
+displeasure and is merely acknowledged.
+
+Rules, asserted facts and fitted geometry are inputs on the left; what the engine
+did with them is on the right. Each input section stays collapsed until it is
+asked for, and closing them all gives the whole width back to the output. Every
+fact field the rules feed into vector math becomes an editable parameter, read
+straight out of the facts JSON so the two cannot drift apart. Nothing runs until
+Run is pressed, and the trace, the value each rule derived, and the output facts
+are read back from the engine'"'"'s own result — editing a rule changes what the
+trace reports, because the trace is built from the source the engine parsed.
+
+The split between measuring and deciding is what the return-kind vocabulary is
+for. `s_cosine(["v:add", ["v:sub", "king", "man"], "woman"], Message.speaker)`
+identifies the speaker through inline vector algebra and gates nothing; it
+generalises to regnal names it was never shown — Queen Victoria 0.75, Elizabeth I
+of England 0.72, against the mayor 0.65 and tractor 0.62. A raw cosine carries no
+portable meaning, so the decisions are made on `c_project`, whose percentile
+against a calibration window means the same thing on any model. Being calibrated,
+`c_project` may be thresholded directly in `when`; the load-time lint rejects
+doing that to a raw scalar.
+
+Every rule carries `no-loop` and none carries `salience`. That is not decoration:
+these conditions ask whether a field is non-empty, and firing a rule never makes
+its own condition false, so without `no-loop` each rule re-fires every cycle to
+the engine'"'"'s cap — 400 firings over 100 cycles instead of 4 over 2. Salience
+changes nothing here and is therefore absent.
 
 ![The editable bench: GRL, facts and fitted axes beside the execution trace the engine produced](examples-semantic.png)
 
-A match string outside the seeded corpus takes the same path with nothing
-precomputed: EmbeddingGemma is downloaded once, the vector is computed in the
-tab, and every vector carries the tier that produced it.
+A message outside the seeded corpus takes the same path with nothing precomputed:
+EmbeddingGemma is downloaded once, the vector is computed in the tab, and every
+vector carries the tier that produced it.
 
-![A free-form match string embedded in the browser, its computed vector driving the same rules to a granted decision](examples-semantic-dynamic.png)
+![A free-form proclamation embedded in the browser, its computed vector driving the same rules to a decision](examples-semantic-dynamic.png)
 
-## Address verification
+## Not currently enabled
 
-One Rust/WASM path standardizes both chat-like text and arbitrary structured
-JSON, matches the result against JSON reference data for customers and products,
-and applies editable organizational policy as GRL rules. Native address
-functions, canonicalization, reference lexical matching, and policy compose in a
-single evaluation — the address domain is never baked into the framework. The
-run reports a validity score, the canonical form, exact and lexical reference
-evidence, fired rules, and the parsed components.
+Address verification, Fraud triage, Streaming and Proof are built but hidden from
+the app. Their runs assert that an element rendered, not what it says, so none of
+them is known to be correct — that is exactly how Proof shipped broken. Each
+returns to the nav once its run checks the values it computes, corroborated
+independently of the app.
 
-![Address verification standardizing an order, matching reference data, and applying brand-owner bill-to policy](examples-address.png)
+Proof is additionally blocked: backward chaining does not resolve a comparison
+whose right-hand operand is another fact, so its knowledge base cannot prove its
+goal. Forward chaining handles the same shape correctly; the asymmetry is in
+upstream `rust-rule-engine`, not in anything vrules removed.
 
-## Fraud triage
-
-A payment-request screen in the layered-fusion shape production fraud stacks use.
-The embedding layer supplies named, versioned geometry — an urgency-pressure axis
-with a percentile calibration window and a BEC-phrasing region fitted from
-exemplars — all fitted in the browser. The symbolic rules make the decision:
-vector scores are evidence beside hard checks (new payee, amount), never a
-standalone gate. Every artifact carries model provenance and is validated against
-the active embedder at load.
-
-![Fraud triage holding a BEC-style request using a fitted urgency axis and phrasing region beside hard checks](examples-fraud-triage.png)
-
-## Streaming
-
-Real-time event stream processing through `WasmStreamProcessor` using native sliding, tumbling, and session windowing in the browser. Each stream event is evaluated against windowed GRL rules with live throughput and accuracy metrics.
-
-![Real-time event stream processing in the browser using WasmStreamProcessor and windowing](examples-streaming.png)
-
-## Proof
-
-Backward-chaining `vrules::prove` runs in the browser — the same engine path the daemon runs. A goal is posed against a GRL knowledge base and the engine works backward, reporting provability, missing facts, and the mathematical proof tree. The example proves a multi-tiered e-commerce order approval chain (`Order.Approved ← Status.FundsAvailable AND Status.RiskIsLow`).
-
-![Backward-chaining proof tree reporting provability and mathematical derivation for order approval](examples-proof.png)
+- [#1 — backward chaining does not resolve fact-to-fact comparisons](https://github.com/ops-ping/vector-rules/issues/1)
+- [#2 — re-enable the remaining examples once their runs assert behaviour](https://github.com/ops-ping/vector-rules/issues/2)
